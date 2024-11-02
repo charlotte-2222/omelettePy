@@ -1,14 +1,21 @@
-import asyncio
 import logging
-import os
+import bungio
+from bungio import *
 
 import aiohttp
 import discord
 from aiohttp.web_fileresponse import extension
-from discord.ext import commands, tasks
-from utilFunc.config import TOKEN
-import sqlite3
+from discord.ext import commands
+from utilFunc.config import TOKEN, BNG_API_KEY, BNG_OAUTH_CLIENT_ID, BNG_OAUTH_URL
 
+
+
+
+bng_client=bungio.Client(
+    bungie_client_id=BNG_OAUTH_CLIENT_ID,
+    bungie_client_secret=BNG_OAUTH_URL,
+    bungie_token=BNG_API_KEY
+)
 
 
 class LoggingFormatter(logging.Formatter):
@@ -79,7 +86,7 @@ class OmelettePy(commands.Bot):
             'cogs.misc',
             'cogs.owner',
             'cogs.help',
-            'cogs.tags'
+            'cogs.tags',
         ]
 
     async def setup_hook(self) -> None:
