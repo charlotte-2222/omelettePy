@@ -1,15 +1,12 @@
 import logging
-import bungio
-from bungio import *
 
 import aiohttp
+import bungio
 import discord
 from aiohttp.web_fileresponse import extension
 from discord.ext import commands
+
 from utilFunc.config import TOKEN, BNG_API_KEY, BNG_OAUTH_CLIENT_ID, BNG_OAUTH_URL
-
-
-
 
 bng_client=bungio.Client(
     bungie_client_id=BNG_OAUTH_CLIENT_ID,

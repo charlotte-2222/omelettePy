@@ -1,14 +1,10 @@
-import logging
 import sqlite3
 import time
+import traceback
 from datetime import datetime
-from dbm import error
 
 import discord
 from discord.ext import commands
-
-import traceback
-import sys, os
 
 db = sqlite3.connect('quotes.db', timeout=30000)
 cursor = db.cursor()

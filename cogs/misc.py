@@ -1,12 +1,8 @@
-from dbm import error
-
-import discord
-from discord import app_commands
-from discord.ext import commands
-from discord.ext.commands import Context
-
 from difflib import SequenceMatcher
 
+import discord
+from discord.ext import commands
+from discord.ext.commands import Context
 
 
 class Misc(commands.Cog, name="Misc"):

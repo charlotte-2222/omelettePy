@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Callable, Generic, Iterable, Protocol, TypeVar, Union, Optional
-from discord.ext import commands
-import asyncio
-import discord
 import io
+from typing import TYPE_CHECKING, Any, Callable, Generic, Iterable, Protocol, TypeVar, Union, Optional
 
+import discord
+from discord.ext import commands
 
 if TYPE_CHECKING:
     from main import OmelettePy
