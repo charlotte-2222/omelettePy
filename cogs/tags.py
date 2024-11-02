@@ -74,8 +74,9 @@ class tags(commands.Cog):
             cursor.execute("SELECT tag_content FROM tag_list WHERE (tag_name)=? LIMIT 1 COLLATE NOCASE", (tag_name,))
             query = cursor.fetchone() # search db for tag name.
             output="\"" + str(query[0]) + "\""
+            np_output=(output.replace('"', ''))
             embed = discord.Embed(title=f"**{tag_name}**",
-                                  description=f"{output}",
+                                  description=f"{np_output}",
                                   colour=discord.Colour.random())
             await ctx.send(embed=embed)
         except Exception as e:

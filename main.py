@@ -104,8 +104,8 @@ class OmelettePy(commands.Bot):
 
     # @tasks.loop(minutes=10)
     # async def background_task(self):
-    #     db=()
-    #     db.connections.close_all()
+
+
 
 
 bot = OmelettePy()
