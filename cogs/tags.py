@@ -75,14 +75,18 @@ class tags(commands.Cog):
             query = cursor.fetchone() # search db for tag name.
             output="\"" + str(query[0]) + "\""
             np_output=(output.replace('"', ''))
-            embed = discord.Embed(title=f"**{tag_name}**",
-                                  description=f"{np_output}",
+            embed = discord.Embed(description=f"{np_output}\n\n"
+                                              f"-# **`Tag:` {tag_name}**",
                                   colour=discord.Colour.random())
+            # await ctx.send(f"{np_output}\n\n"
+            #                f"-# **`Tag: {tag_name}`**")
             await ctx.send(embed=embed)
         except Exception as e:
-            await ctx.send(f"**No tags corresponding to `{tag_name}` were found, **")
+            await ctx.send(f"**No tags corresponding to `{tag_name}` were found.\n**")
+
             cursor.execute("SELECT tag_name FROM tag_list WHERE tag_name LIKE (?)", ('%'+tag_name+'%',))
             query = cursor.fetchall()
+
             #begin converting tuple to string via numpy
             #ive found this is the most efficient method for removing
             # the extra shit in a tuple while also keeping the whole list.
@@ -91,11 +95,12 @@ class tags(commands.Cog):
             np_str_clean=((np_str_query.replace('[', '').
                           replace(']', '')).
                           replace("'", ''))
-            #fucking convoluted as hell
-            embed = discord.Embed(title=f"**Did you mean...**",
-                                  description=f"{np_str_clean}",
-                                  colour=discord.Colour.random())
-            await ctx.send(embed=embed)
+            if np_str_clean=="":
+                return
+            else:
+                #fucking convoluted as hell
+                await ctx.send(f"***Did you mean...***\n"
+                               f"{np_str_clean}")
         db.commit()
 
     @tag_create.error #error catching for tag creation
@@ -103,8 +108,8 @@ class tags(commands.Cog):
         if isinstance(error, commands.MissingRequiredArgument):
             await ctx.send('Please provide a tag name and tag content\n'
                            'Tag name should follow this format:\n'
-                           '^tag_create <tag_name> <tag_content>\n'
-                           '<tag_name> should not include any spaces, inclusion of a space will result'
+                           '**`^tag_create <tag_name> <tag_content>`**\n'
+                           '`<tag_name>` should not include any spaces, inclusion of a space will result'
                            'in an erroneous database commit.\n'
                            'Instead use hyphenation, underscore, and numbering.')
 
@@ -112,6 +117,8 @@ class tags(commands.Cog):
     async def tag_error(self, ctx, error):
         if isinstance(error, commands.MissingRequiredArgument):
             await ctx.send('Please provide a tag name')
+
+
 
 
 

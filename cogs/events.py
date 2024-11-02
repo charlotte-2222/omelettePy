@@ -41,32 +41,22 @@ class Events(commands.Cog):
                             "%m/%d/%Y\n"))
 
 
-    @commands.Cog.listener()
-    async def on_command_error(self, ctx, error):
-        try:
-            raise isinstance(error, commands.CommandNotFound)
-            raise isinstance(error, commands.CommandOnCooldown)
-            raise isinstance(error, discord.ext.commands.MemberNotFound)
-            raise isinstance(error, commands.BadArgument)
-            raise isinstance(error, commands.MissingRequiredArgument)
-            raise isinstance(error, commands.MissingPermissions)
-            raise isinstance(error, commands.BotMissingPermissions)
-            raise isinstance(error, commands.NoPrivateMessage)
-            raise isinstance(error, commands.MissingRole)
-            raise isinstance(error, commands.BotMissingRole)
-            raise isinstance(error, commands.CheckFailure)
-        except Exception as e:
-            exc_type, exc_obj, exc_tb = sys.exc_info()
-            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-
-        errorEm = discord.Embed(title="FUCKKEINF",
-                                description=f"i make fuck\n\n"
-                                            f"the fuck: \n**{error}**\n\n"
-                                            f"**Additional Information**\n\n"
-                                            f"{exc_type}\n{fname}\n{exc_tb.tb_lineno}\n",
-                                colour=discord.Colour.magenta())
-        errorEm.set_footer(text="im gonna kms")
-        await ctx.send(embed=errorEm)
+    # @commands.Cog.listener()
+    # async def on_command_error(self, ctx, error):
+    #     try:
+    #         raise isinstance(error, commands.CheckFailure)
+    #     except Exception as e:
+    #         exc_type, exc_obj, exc_tb = sys.exc_info()
+    #         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+    #
+    #     errorEm = discord.Embed(title="FUCKKEINF",
+    #                             description=f"i make fuck\n\n"
+    #                                         f"the fuck: \n**{error}**\n\n"
+    #                                         f"**Additional Information**\n\n"
+    #                                         f"{exc_type}\n{fname}\n{exc_tb.tb_lineno}\n",
+    #                             colour=discord.Colour.magenta())
+    #     errorEm.set_footer(text="im gonna kms")
+    #     await ctx.send(embed=errorEm)
 
     @commands.command(help="Adds a quote of the mentioned user to Fembot's Database",
                       hidden=False,
@@ -165,6 +155,22 @@ class Events(commands.Cog):
                               colour=discord.Color.random())
         #style.set_author(name=str(query[1]))
         await ctx.reply(embed=style)
+
+    @quote.error
+    async def quote_error(self, ctx, error):
+        if isinstance(error, commands.MissingRequiredArgument):
+            await ctx.reply("Missing required argument\n"
+                            "Please follow correct syntax: **`^qt <@user> <message>`**")
+    @getquote.error
+    async def getquote_error(self, ctx, error):
+        if isinstance(error, commands.MissingRequiredArgument):
+            await ctx.reply("Missing required argument\n"
+                            "Please follow correct syntax: **`^gq <@user>`**")
+    @randomquote.error
+    async def randomquote_error(self, ctx, error):
+        if isinstance(error, commands.MissingRequiredArgument):
+            await ctx.reply("Missing required argument\n"
+                            "Literally just use `^rq`")
 
 
 async def setup(bot):
