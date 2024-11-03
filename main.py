@@ -1,10 +1,11 @@
 import logging
+import random
 
 import aiohttp
 import bungio
 import discord
 from aiohttp.web_fileresponse import extension
-from discord.ext import commands
+from discord.ext import commands, tasks
 
 from utilFunc.config import TOKEN, BNG_API_KEY, BNG_OAUTH_CLIENT_ID, BNG_OAUTH_URL
 
@@ -87,7 +88,7 @@ class OmelettePy(commands.Bot):
         ]
 
     async def setup_hook(self) -> None:
-        #self.background_task.start()
+        self.background_tasks.start()
         self.session = aiohttp.ClientSession()
         self.bot_app_info = await self.application_info()
         self.owner_id = self.bot_app_info.team.owner_id
@@ -101,13 +102,28 @@ class OmelettePy(commands.Bot):
     def owner(self) -> discord.User:
         return self.bot_app_info.owner
 
+    @tasks.loop(minutes=3)
+    async def background_tasks(self) -> None:
+        statuses = ['/help',
+                    '/quote',
+                    '/tag',
+                    'edging rn',
+                    '/new-tag']
+        activity = discord.Activity(
+            type=discord.ActivityType.custom,
+            name="Custom Status",
+            state=random.choice(statuses)
+        )
+        await self.change_presence(activity=activity)
+
+    @background_tasks.before_loop
+    async def before_my_tasks(self) -> None:
+        await self.wait_until_ready()
+
 
     async def close(self) -> None:
         await super().close()
         await self.session.close()
-
-    # @tasks.loop(minutes=10)
-    # async def background_task(self):
 
 
 

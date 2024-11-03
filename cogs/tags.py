@@ -1,4 +1,5 @@
 import sqlite3
+import traceback
 from typing import Literal, Optional
 
 import discord
@@ -22,6 +23,31 @@ print("Loaded tags data set")
 db.commit()
 
 
+class TagMakeModal(discord.ui.Modal, title='Create New Tag'):
+    name = discord.ui.TextInput(label='Name', required=True, max_length=100, min_length=1)
+    content = discord.ui.TextInput(
+        label='Content', required=True, style=discord.TextStyle.long, min_length=1, max_length=2000
+    )
+
+    async def on_submit(self, interaction: discord.Interaction):
+        cursor.execute("SELECT tag_name FROM tag_list WHERE tag_name=?", (self.name.value,))
+        does_exist = cursor.fetchone()
+        if does_exist is None:
+            cursor.execute('insert into tag_list (tag_name, tag_content) values (?,?)',
+                           (self.name.value, self.content.value))
+            db.commit()  # commit new tag / content
+            await interaction.response.send_message(f"Thanks! {self.name.value} has been created!", ephemeral=True)
+        else:
+            return
+
+    async def on_error(self, interaction: discord.Interaction, error: Exception):
+        await interaction.response.send_message(f"You fucked up! {error}", ephemeral=True)
+        traceback.print_exception(type(error), error, error.__traceback__)
+
+
+
+
+
 class tags(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot: commands.Bot = bot
@@ -33,25 +59,11 @@ class tags(commands.Cog):
 
     @app_commands.command(name="new-tag")
     @commands.cooldown(1, 3, commands.BucketType.user)
-    async def tag_create(self, ctx: commands.Context, *, tag_name: str, tag_content: str) -> None:
+    async def tag_create(self, interaction: discord.Interaction) -> None:
         """
-        This command will create a new tag.
-        Context: /new-tag <tag_name> <tag_content>^
-
-        :param tag_name: The string that will be used as a tag.
-        :param tag_content: The string that will be used as the content of the tag.
+        This command will open a modal for you to create a new tag.
         """
-        # new_tag, new_content = first_string.split(" ", 1)
-        cursor.execute("SELECT tag_name FROM tag_list WHERE tag_name=?", (tag_name,))
-        does_exist = cursor.fetchone()
-
-        if does_exist is None:
-            cursor.execute('insert into tag_list (tag_name, tag_content) values (?,?)', (tag_name, tag_content))
-            db.commit() #commit new tag / content
-            await ctx.send(f"**`Tag for {tag_name}`** created!")
-
-        else:
-            await ctx.send("**`Tag already exists`**") #error.
+        await interaction.response.send_modal(TagMakeModal())
 
     @commands.hybrid_command(name="tag")
     @commands.cooldown(1, 3, commands.BucketType.user)
