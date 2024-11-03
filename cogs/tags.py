@@ -52,7 +52,6 @@ class tags(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot: commands.Bot = bot
 
-
     def convertTuple(self, tup):
         str=''.join(tup)
         return str
@@ -79,17 +78,17 @@ class tags(commands.Cog):
             query = cursor.fetchone() # search db for tag name.
             output="\"" + str(query[0]) + "\""
             np_output=(output.replace('"', ''))
-            embed = discord.Embed(description=f"{np_output}\n\n"
-                                              f"-# **`Tag:` {tag_name}**",
-                                  colour=discord.Colour.random())
+            # embed = discord.Embed(description=f"{np_output}\n\n"
+            #                                   f"-# **`Tag:` {tag_name}**",
+            #                       colour=discord.Colour.random())
             # await ctx.send(f"{np_output}\n\n"
             #                f"-# **`Tag: {tag_name}`**")
-            await ctx.send(embed=embed)
+            await ctx.send(f"{np_output}\n"
+                           f"-# **`Tag:` {tag_name}**")
         except Exception as e:
-            await ctx.send(f"**No tags corresponding to `{tag_name}` were found.\n**")
-
-            cursor.execute("SELECT tag_name FROM tag_list WHERE tag_name LIKE (?)", ('%'+tag_name+'%',))
+            cursor.execute("SELECT tag_name FROM tag_list WHERE tag_name LIKE (?) LIMIT 4", ('%' + tag_name + '%',))
             query = cursor.fetchall()
+            # Limiting to 4 so it isn't damn near ridiculous
 
             #begin converting tuple to string via numpy
             #ive found this is the most efficient method for removing
@@ -103,7 +102,8 @@ class tags(commands.Cog):
                 return
             else:
                 #fucking convoluted as hell
-                await ctx.send(f"***Did you mean...***\n"
+                await ctx.send(f"**No tags corresponding to `{tag_name}` were found.**\n"
+                               f"***Did you mean...***\n"
                                f"{np_str_clean}")
         db.commit()
 
