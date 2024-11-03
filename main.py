@@ -1,15 +1,12 @@
 import logging
-import bungio
-from bungio import *
 
 import aiohttp
+import bungio
 import discord
 from aiohttp.web_fileresponse import extension
 from discord.ext import commands
+
 from utilFunc.config import TOKEN, BNG_API_KEY, BNG_OAUTH_CLIENT_ID, BNG_OAUTH_URL
-
-
-
 
 bng_client=bungio.Client(
     bungie_client_id=BNG_OAUTH_CLIENT_ID,
@@ -83,17 +80,17 @@ class OmelettePy(commands.Bot):
                          strip_after_prefix=True)
         self.initial_extensions=[
             'cogs.events',
-            'cogs.misc',
             'cogs.owner',
             'cogs.help',
             'cogs.tags',
+            'cogs.misc'
         ]
 
     async def setup_hook(self) -> None:
         #self.background_task.start()
         self.session = aiohttp.ClientSession()
         self.bot_app_info = await self.application_info()
-        self.owner_id = self.bot_app_info.owner.id
+        self.owner_id = self.bot_app_info.team.owner_id
         try:
             for ext in self.initial_extensions:
                 await self.load_extension(ext)

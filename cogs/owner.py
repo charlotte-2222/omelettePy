@@ -1,12 +1,11 @@
 from discord.ext import commands
 
 
-
-
 class Owner(commands.Cog):
     """Owner only commands"""
     def __init__(self, bot):
         self.bot = bot
+        # self.tree = app_commands.CommandTree(self)
 
     @commands.is_owner()
     @commands.command()

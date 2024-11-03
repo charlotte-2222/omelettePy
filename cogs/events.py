@@ -4,6 +4,8 @@ import traceback
 from datetime import datetime
 
 import discord
+import numpy as np
+from discord import app_commands
 from discord.ext import commands
 
 db = sqlite3.connect('quotes.db', timeout=30000)
@@ -24,8 +26,8 @@ def error_filing():
 
 
 class Events(commands.Cog):
-    def __init__(self, bot):
-        self.bot = bot
+    def __init__(self, bot: commands.Bot):
+        self.bot: commands.Bot = bot
 
     @commands.Cog.listener()
     async def on_ready(self):
@@ -36,43 +38,15 @@ class Events(commands.Cog):
                             "%H:%M:%S\n"
                             "%m/%d/%Y\n"))
 
-
-    # @commands.Cog.listener()
-    # async def on_command_error(self, ctx, error):
-    #     try:
-    #         raise isinstance(error, commands.CheckFailure)
-    #     except Exception as e:
-    #         exc_type, exc_obj, exc_tb = sys.exc_info()
-    #         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-    #
-    #     errorEm = discord.Embed(title="FUCKKEINF",
-    #                             description=f"i make fuck\n\n"
-    #                                         f"the fuck: \n**{error}**\n\n"
-    #                                         f"**Additional Information**\n\n"
-    #                                         f"{exc_type}\n{fname}\n{exc_tb.tb_lineno}\n",
-    #                             colour=discord.Colour.magenta())
-    #     errorEm.set_footer(text="im gonna kms")
-    #     await ctx.send(embed=errorEm)
-
-    @commands.command(help="Adds a quote of the mentioned user to Fembot's Database",
-                      hidden=False,
-                      aliases=['qt'])
+    @app_commands.command(name="quote")
     @commands.cooldown(1, 3, commands.BucketType.user)
-    async def quote(self, ctx, *, message: str):
-        # split the message into words
-        string = str(message)
-        temp = string.split()
-
-        # take the username out
-        user = temp[0]
-        del temp[0]
-
-        # join the message back together
-        text = " ".join(temp)
-
-        if user[1] != '@':
-            await ctx.reply("Use ```@[user] [message]``` to quote a person")
-            return
+    async def quote(self, interaction: discord.Interaction, user: str, message: str):
+        """
+        This command will quote a user's message
+        :param user: The user being quoted (use @)
+        :param message: The message being quoted
+        """
+        # converted to slash commands
 
         uniqueID = hash(user + message)
 
@@ -88,25 +62,26 @@ class Events(commands.Cog):
             return
 
         # insert into database
-        cursor.execute("INSERT INTO quotes VALUES(?,?,?,?)", (uniqueID, user, text, formatted_time))
-        await ctx.reply("Quote successfully added")
+        cursor.execute("INSERT INTO quotes VALUES(?,?,?,?)", (uniqueID, user, message, formatted_time))
+        await interaction.response.send_message("Quote added!", ephemeral=True)
 
         db.commit()
 
         # number of words in the database
         rows = cursor.execute("SELECT * from quotes")
-
-        # log to terminal
+        # print logging
         print(str(len(rows.fetchall())) + ". added - " + str(user) + ": \"" + str(
-            text) + "\" to database at " + formatted_time)
+            message) + "\" to database at " + formatted_time)
 
-    @commands.command(help="Tag a user to pull one of their quotes from the database (randomly chosen)",
-                      aliases=['gq'],
-                      hidden=False)
+    @commands.hybrid_command(name="get-quote")
     @commands.cooldown(1, 3, commands.BucketType.user)
-    async def getquote(self, ctx, message: str):
+    async def gq(self, ctx: commands.Context, user: str):
+        """
+        This command will get a random quote from a specific user
+        :param user: The user you wish to get a quote from.
+        """
         # sanitise name
-        user = (message,)
+        user = (user,)
 
         try:
             # query random quote from user
@@ -116,12 +91,18 @@ class Events(commands.Cog):
             # adds quotes to message
             output = "\"" + str(query[0]) + "\""
 
-            # log
-            print(message + ": \"" + output + "\" printed to the screen " + str(query[1]))
+            np_query = np.array(user)
+            np_str_query = np.array2string(np_query, separator=', ')
+            np_str_clean = (((((np_str_query.
+                                replace('(', '').
+                                replace('])', '')).
+                               replace("'", '')).
+                              replace(",", "")).
+                             replace("[", "")).
+                            replace("]", ""))
 
             # embeds the output to make it pretty
-            style = discord.Embed(title="responding quote",
-                                  description=f"{output}"+"\n\n- " + message + " \n" + str(query[1]),
+            style = discord.Embed(description=f"{output}" + f"\n\n- {np_str_clean} \n" + str(query[1]),
                                   colour=discord.Color.random())
             #style.set_author(name=output)
             await ctx.reply(embed=style)
@@ -132,12 +113,12 @@ class Events(commands.Cog):
 
         db.commit()
 
-    @commands.command(help="Pull a random quote from the database (across all users)",
-                      aliases=['rq'],
-                      hidden=False)
+    @commands.hybrid_command(name="random-quote")
     @commands.cooldown(1, 3, commands.BucketType.user)
-    async def randomquote(self, ctx):
-
+    async def rq(self, ctx: commands.Context):
+        """
+        This command will get a random quote from a random user.
+        """
         cursor.execute("SELECT user,message,date_added FROM quotes ORDER BY RANDOM() LIMIT 1")
         query = cursor.fetchone()
 
@@ -149,7 +130,6 @@ class Events(commands.Cog):
                               description=str(query[1]) +
                                           "\n\n- "+ str(query[0]) + " " + "\n"+str(query[2]),
                               colour=discord.Color.random())
-        #style.set_author(name=str(query[1]))
         await ctx.reply(embed=style)
 
     @quote.error
@@ -157,12 +137,14 @@ class Events(commands.Cog):
         if isinstance(error, commands.MissingRequiredArgument):
             await ctx.reply("Missing required argument\n"
                             "Please follow correct syntax: **`^qt <@user> <message>`**")
-    @getquote.error
+
+    @gq.error
     async def getquote_error(self, ctx, error):
         if isinstance(error, commands.MissingRequiredArgument):
             await ctx.reply("Missing required argument\n"
                             "Please follow correct syntax: **`^gq <@user>`**")
-    @randomquote.error
+
+    @rq.error
     async def randomquote_error(self, ctx, error):
         if isinstance(error, commands.MissingRequiredArgument):
             await ctx.reply("Missing required argument\n"

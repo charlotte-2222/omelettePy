@@ -1,10 +1,10 @@
-import numpy as np
+import sqlite3
+from typing import Literal, Optional
 
 import discord
+import numpy as np
+from discord import app_commands
 from discord.ext import commands
-
-import sqlite3
-
 
 """
 This is the tags cog.
@@ -23,47 +23,39 @@ db.commit()
 
 
 class tags(commands.Cog):
-    def __init__(self, bot):
-        self.bot = bot
+    def __init__(self, bot: commands.Bot) -> None:
+        self.bot: commands.Bot = bot
 
 
     def convertTuple(self, tup):
         str=''.join(tup)
         return str
 
-    @commands.command(description="This command will create a new tag.\n"
-                                  "Context: ^tag_create <tag_name> <tag_content>\n"
-                                  "Warning: <tag_name> should not include any spaces, inclusion of a space "
-                                  "will begin creation of <tag_content>. Instead, use hyphenation, underscore, and numbering.",
-                      aliases=['create_tag', 'newTag'])
+    @app_commands.command(name="new-tag")
     @commands.cooldown(1, 3, commands.BucketType.user)
-    async def tag_create(self, ctx, *, first_string:str):
+    async def tag_create(self, ctx: commands.Context, *, tag_name: str, tag_content: str) -> None:
         """
         This command will create a new tag.
-        Context: ^tag_create <tag_name> <tag_content>^
+        Context: /new-tag <tag_name> <tag_content>^
 
-        Warning: <tag_name> should not include any spaces, inclusion of a space
-        will begin creation of <tag_content>. Instead, use hyphenation, underscore, and numbering.
-
-        :param first_string: The string that will be used as a tag.
+        :param tag_name: The string that will be used as a tag.
+        :param tag_content: The string that will be used as the content of the tag.
         """
-        new_tag, new_content = first_string.split(" ", 1)
-        cursor.execute("SELECT tag_name FROM tag_list WHERE tag_name=?", (new_tag,))
+        # new_tag, new_content = first_string.split(" ", 1)
+        cursor.execute("SELECT tag_name FROM tag_list WHERE tag_name=?", (tag_name,))
         does_exist = cursor.fetchone()
 
         if does_exist is None:
-            cursor.execute('insert into tag_list (tag_name, tag_content) values (?,?)', (new_tag, new_content))
+            cursor.execute('insert into tag_list (tag_name, tag_content) values (?,?)', (tag_name, tag_content))
             db.commit() #commit new tag / content
-            await ctx.send(f"**`Tag for {new_tag}`** created!")
+            await ctx.send(f"**`Tag for {tag_name}`** created!")
+
         else:
             await ctx.send("**`Tag already exists`**") #error.
 
-
-    @commands.command(description="This is the command you will use to find a tag from the database.\n"
-                                  "Context: ^tag <name_of_tag>",
-                      aliases=['tag'])
+    @commands.hybrid_command(name="tag")
     @commands.cooldown(1, 3, commands.BucketType.user)
-    async def tag_find(self, ctx, tag_name:str):
+    async def tag_find(self, ctx: commands.Context, tag_name: str):
         """
         This is the command you will use to find a tag from the database.
         Context: ^tag <name_of_tag>
@@ -103,6 +95,7 @@ class tags(commands.Cog):
                                f"{np_str_clean}")
         db.commit()
 
+
     @tag_create.error #error catching for tag creation
     async def tag_error(self, ctx, error):
         if isinstance(error, commands.MissingRequiredArgument):
@@ -118,11 +111,40 @@ class tags(commands.Cog):
         if isinstance(error, commands.MissingRequiredArgument):
             await ctx.send('Please provide a tag name')
 
+    @commands.command(hidden=True)
+    @commands.guild_only()
+    @commands.is_owner()
+    async def sync(self, ctx: commands.Context, guilds: commands.Greedy[discord.Object],
+                   spec: Optional[Literal["~", "*", "^"]] = None) -> None:
+        if not guilds:
+            if spec == "~":
+                synced = await ctx.bot.tree.sync(guild=ctx.guild)
+            elif spec == "*":
+                ctx.bot.tree.copy_global_to(guild=ctx.guild)
+                synced = await ctx.bot.tree.sync(guild=ctx.guild)
+            elif spec == "^":
+                ctx.bot.tree.clear_commands(guild=ctx.guild)
+                await ctx.bot.tree.sync(guild=ctx.guild)
+                synced = []
+            else:
+                synced = await ctx.bot.tree.sync()
+
+            await ctx.send(
+                f"Synced {len(synced)} commands {'globally' if spec is None else 'to the current guild.'}"
+            )
+            return
+
+        ret = 0
+        for guild in guilds:
+            try:
+                await ctx.bot.tree.sync(guild=guild)
+            except discord.HTTPException:
+                pass
+            else:
+                ret += 1
+
+        await ctx.send(f"Synced the tree to {ret}/{len(guilds)}.")
 
 
-
-
-
-
-async def setup(bot):
+async def setup(bot: commands.Bot) -> None:
     await bot.add_cog(tags(bot))
