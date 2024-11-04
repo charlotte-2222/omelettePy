@@ -69,26 +69,18 @@ class tags(commands.Cog):
     async def tag_find(self, ctx: commands.Context, tag_name: str):
         """
         This is the command you will use to find a tag from the database.
-        Context: ^tag <name_of_tag>
-
-        :param tag_name: The name of the tag you want to find
+        Context: /tag <name_of_tag>
         """
         try:
             cursor.execute("SELECT tag_content FROM tag_list WHERE (tag_name)=? LIMIT 1 COLLATE NOCASE", (tag_name,))
             query = cursor.fetchone() # search db for tag name.
             output="\"" + str(query[0]) + "\""
             np_output=(output.replace('"', ''))
-            # embed = discord.Embed(description=f"{np_output}\n\n"
-            #                                   f"-# **`Tag:` {tag_name}**",
-            #                       colour=discord.Colour.random())
-            # await ctx.send(f"{np_output}\n\n"
-            #                f"-# **`Tag: {tag_name}`**")
-            await ctx.send(f"{np_output}\n"
-                           f"-# **`Tag:` {tag_name}**")
+
+            await ctx.send(f"{np_output}")
         except Exception as e:
             cursor.execute("SELECT tag_name FROM tag_list WHERE tag_name LIKE (?) LIMIT 4", ('%' + tag_name + '%',))
-            query = cursor.fetchall()
-            # Limiting to 4 so it isn't damn near ridiculous
+            query = cursor.fetchall()  # Limiting to 4 so it isn't damn near ridiculous
 
             #begin converting tuple to string via numpy
             #ive found this is the most efficient method for removing
@@ -119,7 +111,7 @@ class tags(commands.Cog):
                            'Instead use hyphenation, underscore, and numbering.')
 
     @tag_find.error # error catching for tag finding
-    async def tag_error(self, ctx, error):
+    async def tag_find_error(self, ctx, error):
         if isinstance(error, commands.MissingRequiredArgument):
             await ctx.send('Please provide a tag name')
 

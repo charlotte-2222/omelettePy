@@ -1,11 +1,10 @@
 import logging
-import random
 
 import aiohttp
 import bungio
 import discord
 from aiohttp.web_fileresponse import extension
-from discord.ext import commands, tasks
+from discord.ext import commands
 
 from utilFunc.config import TOKEN, BNG_API_KEY, BNG_OAUTH_CLIENT_ID, BNG_OAUTH_URL
 
@@ -65,7 +64,7 @@ logger.addHandler(console_handler)
 logger.addHandler(file_handler)
 
 
-def get_prefix(bot, message):
+def _get_prefix(bot, message):
     prefixes = ['^']
     if not message.guild:
         return ['?', '^']
@@ -75,10 +74,20 @@ def get_prefix(bot, message):
 class OmelettePy(commands.Bot):
     bot_app_info: discord.AppInfo
     def __init__(self):
-        super().__init__(command_prefix=get_prefix,
-                         intents=discord.Intents.all(),
+        allowed_mentions = discord.AllowedMentions(roles=False, everyone=False, users=True)
+        intents = discord.Intents(
+            guilds=True,
+            members=True,
+            messages=True,
+            reactions=True,
+            message_content=True
+        )
+        super().__init__(command_prefix=_get_prefix,
                          case_insensitive=True,
-                         strip_after_prefix=True)
+                         strip_after_prefix=True,
+                         intents=intents,
+                         allowed_mentions=allowed_mentions
+                         )
         self.initial_extensions=[
             'cogs.events',
             'cogs.owner',
@@ -88,7 +97,7 @@ class OmelettePy(commands.Bot):
         ]
 
     async def setup_hook(self) -> None:
-        self.background_tasks.start()
+        # self.background_tasks.start()
         self.session = aiohttp.ClientSession()
         self.bot_app_info = await self.application_info()
         self.owner_id = self.bot_app_info.team.owner_id
@@ -102,23 +111,23 @@ class OmelettePy(commands.Bot):
     def owner(self) -> discord.User:
         return self.bot_app_info.owner
 
-    @tasks.loop(minutes=3)
-    async def background_tasks(self) -> None:
-        statuses = ['/help',
-                    '/quote',
-                    '/tag',
-                    'edging rn',
-                    '/new-tag']
-        activity = discord.Activity(
-            type=discord.ActivityType.custom,
-            name="Custom Status",
-            state=random.choice(statuses)
-        )
-        await self.change_presence(activity=activity)
+    # @tasks.loop(minutes=3)
+    # async def background_tasks(self) -> None:
+    #     statuses = ['/help',
+    #                 '/quote',
+    #                 '/tag',
+    #                 'edging rn',
+    #                 '/new-tag']
+    #     activity = discord.Activity(
+    #         type=discord.ActivityType.custom,
+    #         name="Custom Status",
+    #         state=random.choice(statuses)
+    #     )
+    #     await self.change_presence(activity=activity)
 
-    @background_tasks.before_loop
-    async def before_my_tasks(self) -> None:
-        await self.wait_until_ready()
+    # @background_tasks.before_loop
+    # async def before_my_tasks(self) -> None:
+    #     await self.wait_until_ready()
 
 
     async def close(self) -> None:

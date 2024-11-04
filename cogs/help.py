@@ -9,7 +9,7 @@ from discord.ext import commands
 
 # Global variables for easy modification
 DEFAULT_EMBED_COLOR = discord.Color.random()
-DEFAULT_EMBED_TITLE = "peepnus help"
+DEFAULT_EMBED_TITLE = "Ommie's Little Helper :3"
 DEFAULT_EMBED_FOOTER = "Type `help <command>` for more info on a command."
 DEFAULT_OWNER_ONLY_MESSAGE = "This command does not exist or you don't have permission to view its details."
 DEFAULT_NO_CATEGORY_NAME = "No Category"
