@@ -93,7 +93,8 @@ class OmelettePy(commands.Bot):
             'cogs.owner',
             'cogs.help',
             'cogs.tags',
-            'cogs.misc'
+            'cogs.misc',
+            'cogs.tictactoe'
         ]
 
     async def setup_hook(self) -> None:

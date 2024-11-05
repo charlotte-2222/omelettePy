@@ -55,14 +55,16 @@ class Events(commands.Cog):
         formatted_time = str(time.strftime("%a, %d %b %Y %H:%M:%S"))
 
         # find if message is in the db already
-        cursor.execute("SELECT count(*) FROM quotes WHERE hash = ?", (uniqueID,))
+        cursor.execute("SELECT count(*) FROM quotes WHERE hash = ?",
+                       (uniqueID,))
         find = cursor.fetchone()[0]
 
         if find > 0:
             return
 
         # insert into database
-        cursor.execute("INSERT INTO quotes VALUES(?,?,?,?)", (uniqueID, user, message, formatted_time))
+        cursor.execute("INSERT INTO quotes VALUES(?,?,?,?)",
+                       (uniqueID, user, message, formatted_time))
         await interaction.response.send_message("Quote added!", ephemeral=True)
 
         db.commit()

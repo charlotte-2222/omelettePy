@@ -24,13 +24,21 @@ db.commit()
 
 
 class TagMakeModal(discord.ui.Modal, title='Create New Tag'):
-    name = discord.ui.TextInput(label='Name', required=True, max_length=100, min_length=1)
+    name = discord.ui.TextInput(label='Name',
+                                required=True,
+                                max_length=100,
+                                min_length=1)
     content = discord.ui.TextInput(
-        label='Content', required=True, style=discord.TextStyle.long, min_length=1, max_length=2000
+        label='Content',
+        required=True,
+        style=discord.TextStyle.long,
+        min_length=1,
+        max_length=2000
     )
 
     async def on_submit(self, interaction: discord.Interaction):
-        cursor.execute("SELECT tag_name FROM tag_list WHERE tag_name=?", (self.name.value,))
+        cursor.execute("SELECT tag_name FROM tag_list WHERE tag_name=?",
+                       (self.name.value,))
         does_exist = cursor.fetchone()
         if does_exist is None:
             cursor.execute('insert into tag_list (tag_name, tag_content) values (?,?)',
@@ -72,19 +80,24 @@ class tags(commands.Cog):
         Context: /tag <name_of_tag>
         """
         try:
-            cursor.execute("SELECT tag_content FROM tag_list WHERE (tag_name)=? LIMIT 1 COLLATE NOCASE", (tag_name,))
+            cursor.execute("SELECT tag_content FROM tag_list WHERE (tag_name)=? LIMIT 1 COLLATE NOCASE",
+                           (tag_name,))
             query = cursor.fetchone() # search db for tag name.
             output="\"" + str(query[0]) + "\""
             np_output=(output.replace('"', ''))
 
             await ctx.send(f"{np_output}")
         except Exception as e:
-            cursor.execute("SELECT tag_name FROM tag_list WHERE tag_name LIKE (?) LIMIT 4", ('%' + tag_name + '%',))
+            # idk what im doing with the `e` variable
+            # but im too afraid to change it
+            cursor.execute("SELECT tag_name FROM tag_list WHERE tag_name LIKE (?) LIMIT 4",
+                           ('%' + tag_name + '%',))
             query = cursor.fetchall()  # Limiting to 4 so it isn't damn near ridiculous
 
             #begin converting tuple to string via numpy
             #ive found this is the most efficient method for removing
             # the extra shit in a tuple while also keeping the whole list.
+
             np_query=np.array(query)
             np_str_query=np.array2string(np_query, separator=', ')
             np_str_clean=((np_str_query.replace('[', '').

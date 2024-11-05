@@ -2,19 +2,14 @@ from difflib import SequenceMatcher
 
 import discord
 from discord.ext import commands
-from discord.ext.commands import Context
 
 
 class Misc(commands.Cog, name="Misc"):
-    def __init__(self, bot) -> None:
-        self.bot = bot
+    def __init__(self, bot: commands.Bot) -> None:
+        self.bot: commands.Bot = bot
 
-
-    @commands.command(
-        name="ping",
-        description="this is a ping command",
-    )
-    async def ping(self, context: Context) -> None:
+    @commands.hybrid_command(name="ping")
+    async def ping(self, ctx: commands.Context) -> None:
         """
         This is a ping command
 
@@ -25,7 +20,7 @@ class Misc(commands.Cog, name="Misc"):
             description=f"Latency: {round(self.bot.latency * 1000)}ms.",
             color=discord.Color.magenta()
         )
-        await context.send(embed=embed)
+        await ctx.send(embed=embed)
 
         # create bot listener
 
