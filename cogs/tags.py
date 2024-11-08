@@ -85,51 +85,39 @@ class tags(commands.Cog):
             cursor.execute(
                 "SELECT tag_content FROM tag_list WHERE (tag_name)=? AND (guild_id)=? LIMIT 1 COLLATE NOCASE",
                 (tag_name, guild.id,))
-            query = cursor.fetchone() # search db for tag name.
-            output="\"" + str(query[0]) + "\""
-            np_output=(output.replace('"', ''))
+            query = cursor.fetchone()  # search db for tag name.
+            output = "\"" + str(query[0]) + "\""
+            np_output = (output.replace('"', ''))
 
             await ctx.send(f"{np_output}")
         except Exception as e:
             # idk what im doing with the `e` variable
             # but im too afraid to change it
-            cursor.execute("SELECT tag_name FROM tag_list WHERE tag_name AND guild_id LIKE (?,?) LIMIT 4",
-                           ('%' + tag_name + '%', guild.id,))
-            query = cursor.fetchall()  # Limiting to 4 so it isn't damn near ridiculous
 
-            #begin converting tuple to string via numpy
-            #ive found this is the most efficient method for removing
+            guild = ctx.guild
+            cursor.execute(
+                "SELECT tag_name FROM tag_list WHERE tag_name LIKE (?) AND guild_id =? LIMIT 6 COLLATE NOCASE",
+                ("%" + tag_name + "%", guild.id,))
+            query = cursor.fetchall()  # Limiting to 6 so it isn't damn near ridiculous
+
+            # begin converting tuple to string via numpy
+            # ive found this is the most efficient method for removing
             # the extra shit in a tuple while also keeping the whole list.
 
-            np_query=np.array(query)
-            np_str_query=np.array2string(np_query, separator=', ')
-            np_str_clean=((np_str_query.replace('[', '').
-                          replace(']', '')).
-                          replace("'", ''))
-            if np_str_clean=="":
+            np_query = np.array(query)
+            np_str_query = np.array2string(np_query, separator=', ')
+            np_str_clean = ((np_str_query.replace('[', '').
+                             replace(']', '')).
+                            replace("'", ''))
+            if np_str_clean == "":
+                await ctx.send(f"**No tags that correspond either directly or somewhat to `{tag_name}` were found.**\n")
                 return
             else:
-                #fucking convoluted as hell
+                # fucking convoluted as hell
                 await ctx.send(f"**No tags corresponding to `{tag_name}` were found.**\n"
                                f"***Did you mean...***\n"
                                f"{np_str_clean}")
         db.commit()
-
-
-    @tag_create.error #error catching for tag creation
-    async def tag_error(self, ctx, error):
-        if isinstance(error, commands.MissingRequiredArgument):
-            await ctx.send('Please provide a tag name and tag content\n'
-                           'Tag name should follow this format:\n'
-                           '**`^tag_create <tag_name> <tag_content>`**\n'
-                           '`<tag_name>` should not include any spaces, inclusion of a space will result'
-                           'in an erroneous database commit.\n'
-                           'Instead use hyphenation, underscore, and numbering.')
-
-    @tag_find.error # error catching for tag finding
-    async def tag_find_error(self, ctx, error):
-        if isinstance(error, commands.MissingRequiredArgument):
-            await ctx.send('Please provide a tag name')
 
     @commands.command(hidden=True)
     @commands.guild_only()
