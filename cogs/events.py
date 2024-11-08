@@ -10,7 +10,8 @@ from discord.ext import commands
 
 db = sqlite3.connect('quotes.db', timeout=30000)
 cursor = db.cursor()
-cursor.execute('CREATE TABLE IF NOT EXISTS quotes(hash TEXT primary key, user TEXT, message TEXT, date_added TEXT)')
+cursor.execute('CREATE TABLE IF NOT EXISTS quotes(hash TEXT primary key, '
+               'user TEXT, message TEXT, date_added TEXT, guild_id INT)')
 print("Loaded Quotes database")
 db.commit()
 
@@ -47,7 +48,7 @@ class Events(commands.Cog):
         :param message: The message being quoted
         """
         # converted to slash commands
-
+        guild = interaction.guild
         uniqueID = hash(user + message)
 
         # date and time of the message
@@ -55,16 +56,16 @@ class Events(commands.Cog):
         formatted_time = str(time.strftime("%a, %d %b %Y %H:%M:%S"))
 
         # find if message is in the db already
-        cursor.execute("SELECT count(*) FROM quotes WHERE hash = ?",
-                       (uniqueID,))
+        cursor.execute("SELECT count(*) FROM quotes WHERE hash = ? AND guild_id = ?",
+                       (uniqueID, guild.id))
         find = cursor.fetchone()[0]
 
         if find > 0:
             return
 
         # insert into database
-        cursor.execute("INSERT INTO quotes VALUES(?,?,?,?)",
-                       (uniqueID, user, message, formatted_time))
+        cursor.execute("INSERT INTO quotes VALUES(?,?,?,?,?)",
+                       (uniqueID, user, message, formatted_time, guild.id))
         await interaction.response.send_message("Quote added!", ephemeral=True)
 
         db.commit()
@@ -84,10 +85,13 @@ class Events(commands.Cog):
         """
         # sanitise name
         user = (user,)
+        guild = ctx.guild
 
         try:
             # query random quote from user
-            cursor.execute("SELECT message,date_added FROM quotes WHERE user=(?) ORDER BY RANDOM() LIMIT 1", user)
+            cursor.execute(
+                "SELECT message,date_added FROM quotes WHERE user=(?) AND guild_id=(?) ORDER BY RANDOM() LIMIT 1", user,
+                guild.id)
             query = cursor.fetchone()
 
             # adds quotes to message
@@ -121,7 +125,9 @@ class Events(commands.Cog):
         """
         This command will get a random quote from a random user.
         """
-        cursor.execute("SELECT user,message,date_added FROM quotes ORDER BY RANDOM() LIMIT 1")
+        guild = ctx.guild
+        cursor.execute("SELECT user,message,date_added FROM quotes WHERE guild_id=(?) ORDER BY RANDOM() LIMIT 1",
+                       guild.id)
         query = cursor.fetchone()
 
         # log

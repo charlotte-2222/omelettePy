@@ -18,7 +18,8 @@ commands.
 #Database connection
 db = sqlite3.connect('tags.db', timeout = 30000)
 cursor = db.cursor()
-cursor.execute('CREATE TABLE IF NOT EXISTS tag_list (tag_name TEXT NOT NULL,tag_content TEXT NOT NULL)')
+cursor.execute(
+    'CREATE TABLE IF NOT EXISTS tag_list (tag_name TEXT NOT NULL,tag_content TEXT NOT NULL, guild_id INTEGER NOT NULL)')
 print("Loaded tags data set")
 db.commit()
 
@@ -37,12 +38,12 @@ class TagMakeModal(discord.ui.Modal, title='Create New Tag'):
     )
 
     async def on_submit(self, interaction: discord.Interaction):
-        cursor.execute("SELECT tag_name FROM tag_list WHERE tag_name=?",
-                       (self.name.value,))
+        cursor.execute("SELECT tag_name FROM tag_list WHERE tag_name=? AND guild_id=?",
+                       (self.name.value, interaction.guild.id))
         does_exist = cursor.fetchone()
         if does_exist is None:
-            cursor.execute('insert into tag_list (tag_name, tag_content) values (?,?)',
-                           (self.name.value, self.content.value))
+            cursor.execute('insert into tag_list (tag_name, tag_content, guild_id) values (?,?,?)',
+                           (self.name.value, self.content.value, interaction.guild.id))
             db.commit()  # commit new tag / content
             await interaction.response.send_message(f"Thanks! {self.name.value} has been created!", ephemeral=True)
         else:
@@ -76,12 +77,14 @@ class tags(commands.Cog):
     @commands.cooldown(1, 3, commands.BucketType.user)
     async def tag_find(self, ctx: commands.Context, tag_name: str):
         """
-        This is the command you will use to find a tag from the database.
+        This is the command you will use to find a tag from the database by current guild.
         Context: /tag <name_of_tag>
         """
         try:
-            cursor.execute("SELECT tag_content FROM tag_list WHERE (tag_name)=? LIMIT 1 COLLATE NOCASE",
-                           (tag_name,))
+            guild = ctx.guild
+            cursor.execute(
+                "SELECT tag_content FROM tag_list WHERE (tag_name)=? AND (guild_id)=? LIMIT 1 COLLATE NOCASE",
+                (tag_name, guild.id,))
             query = cursor.fetchone() # search db for tag name.
             output="\"" + str(query[0]) + "\""
             np_output=(output.replace('"', ''))
@@ -90,8 +93,8 @@ class tags(commands.Cog):
         except Exception as e:
             # idk what im doing with the `e` variable
             # but im too afraid to change it
-            cursor.execute("SELECT tag_name FROM tag_list WHERE tag_name LIKE (?) LIMIT 4",
-                           ('%' + tag_name + '%',))
+            cursor.execute("SELECT tag_name FROM tag_list WHERE tag_name AND guild_id LIKE (?,?) LIMIT 4",
+                           ('%' + tag_name + '%', guild.id,))
             query = cursor.fetchall()  # Limiting to 4 so it isn't damn near ridiculous
 
             #begin converting tuple to string via numpy
