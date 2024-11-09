@@ -96,7 +96,6 @@ class OmelettePy(commands.AutoShardedBot):
             'cogs.misc',
             'cogs.tictactoe'
         ]
-
     async def setup_hook(self) -> None:
         # self.background_tasks.start()
         self.session = aiohttp.ClientSession()
