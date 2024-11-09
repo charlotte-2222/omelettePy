@@ -54,6 +54,14 @@ class TagMakeModal(discord.ui.Modal, title='Create New Tag'):
         traceback.print_exception(type(error), error, error.__traceback__)
 
 
+# class ModifyTagModal(discord.ui.Modal, title='Modify Tag'):
+#     content = discord.ui.TextInput(
+#         label='Tag Content', required=True, style=discord.TextStyle.long, min_length=1, max_length=2000
+#     )
+#     def __init__(self, text:str):
+#         super().__init__()
+
+
 
 
 
