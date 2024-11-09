@@ -71,7 +71,7 @@ def _get_prefix(bot, message):
     return commands.when_mentioned_or(*prefixes)(bot, message)
 
 
-class OmelettePy(commands.Bot):
+class OmelettePy(commands.AutoShardedBot):
     bot_app_info: discord.AppInfo
     def __init__(self):
         allowed_mentions = discord.AllowedMentions(roles=False, everyone=False, users=True)
@@ -111,24 +111,6 @@ class OmelettePy(commands.Bot):
     @property
     def owner(self) -> discord.User:
         return self.bot_app_info.owner
-
-    # @tasks.loop(minutes=3)
-    # async def background_tasks(self) -> None:
-    #     statuses = ['/help',
-    #                 '/quote',
-    #                 '/tag',
-    #                 'edging rn',
-    #                 '/new-tag']
-    #     activity = discord.Activity(
-    #         type=discord.ActivityType.custom,
-    #         name="Custom Status",
-    #         state=random.choice(statuses)
-    #     )
-    #     await self.change_presence(activity=activity)
-
-    # @background_tasks.before_loop
-    # async def before_my_tasks(self) -> None:
-    #     await self.wait_until_ready()
 
 
     async def close(self) -> None:
