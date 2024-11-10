@@ -32,7 +32,6 @@ class Events(commands.Cog):
 
     @commands.Cog.listener()
     async def on_ready(self):
-        print("egg thing online\n")
         print(f"Logged in as {self.bot.user} - {self.bot.user.id}\n")
         print("--------------")
         print(time.strftime(f"Time at start:\n"

@@ -18,6 +18,9 @@ class TicTacToeButton(discord.ui.Button['TicTacToe']):
     # This function is called whenever this particular button is pressed
     # This is part of the "meat" of the game logic
     async def callback(self, interaction: discord.Interaction):
+        global player1
+        global player2
+
         assert self.view is not None
         view: TicTacToe = self.view
         state = view.board[self.y][self.x]
@@ -25,19 +28,25 @@ class TicTacToeButton(discord.ui.Button['TicTacToe']):
             return
 
         if view.current_player == view.X:
-            self.style = discord.ButtonStyle.danger
-            self.label = 'X'
-            self.disabled = True
-            view.board[self.y][self.x] = view.X
-            view.current_player = view.O
-            content = "It is now O's turn"
+            if interaction.user != player1:
+                await interaction.response.send_message("It's not your turn!", ephemeral=True)
+            else:
+                self.style = discord.ButtonStyle.danger
+                self.label = 'X'
+                self.disabled = True
+                view.board[self.y][self.x] = view.X
+                view.current_player = view.O
+                content = "It is now O's turn"
         else:
-            self.style = discord.ButtonStyle.success
-            self.label = 'O'
-            self.disabled = True
-            view.board[self.y][self.x] = view.O
-            view.current_player = view.X
-            content = "It is now X's turn"
+            if interaction.user != player2:
+                await interaction.response.send_message("It's not your turn!", ephemeral=True)
+            else:
+                self.style = discord.ButtonStyle.success
+                self.label = 'O'
+                self.disabled = True
+                view.board[self.y][self.x] = view.O
+                view.current_player = view.X
+                content = "It is now X's turn"
 
         winner = view.check_board_winner()
         if winner is not None:
@@ -123,8 +132,12 @@ class TicTac(commands.Cog):
         self.bot = bot
 
     @app_commands.command(name='tic-tac-toe')
-    async def tic_tac_toe(self, interaction: discord.Interaction):
+    async def tic_tac_toe(self, interaction: discord.Interaction, enemy: discord.Member):
         await interaction.response.send_message("Tic Tac Toe: X goes first", view=TicTacToe())
+        global player1
+        global player2
+        player1 = interaction.user
+        player2 = enemy
 
 
 async def setup(bot):
