@@ -132,6 +132,9 @@ class tags(commands.Cog):
     @commands.is_owner()
     async def sync(self, ctx: commands.Context, guilds: commands.Greedy[discord.Object],
                    spec: Optional[Literal["~", "*", "^"]] = None) -> None:
+        """
+        just syncs global commands and shit like that
+        """
         if not guilds:
             if spec == "~":
                 synced = await ctx.bot.tree.sync(guild=ctx.guild)
