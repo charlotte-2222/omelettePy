@@ -53,6 +53,13 @@ class TagMakeModal(discord.ui.Modal, title='Create New Tag'):
         await interaction.response.send_message(f"You fucked up! {error}", ephemeral=True)
         traceback.print_exception(type(error), error, error.__traceback__)
 
+    # class TagSearchView(discord.ui.Button):
+    '''
+    Make a tag search view here at some point
+    '''
+    # def __init__(self, la):
+
+
 
 # class ModifyTagModal(discord.ui.Modal, title='Modify Tag'):
 #     content = discord.ui.TextInput(

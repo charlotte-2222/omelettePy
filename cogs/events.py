@@ -8,6 +8,8 @@ import numpy as np
 from discord import app_commands
 from discord.ext import commands
 
+from utilFunc.context import GuildContext
+
 db = sqlite3.connect('quotes.db', timeout=30000)
 cursor = db.cursor()
 cursor.execute('CREATE TABLE IF NOT EXISTS quotes(hash TEXT primary key, '
@@ -77,13 +79,16 @@ class Events(commands.Cog):
 
     @commands.hybrid_command(name="get-quote")
     @commands.cooldown(1, 3, commands.BucketType.user)
-    async def gq(self, ctx: commands.Context, user: str):
+    async def gq(self, ctx: GuildContext, user: discord.Member | discord.User):
         """
         This command will get a random quote from a specific user
         :param user: The user you wish to get a quote from.
         """
+        # convert mentioned user to ID
+
+
         # sanitise name
-        user = (user,)
+        name = str(user)
         guild = ctx.guild
 
         try:
@@ -109,7 +114,7 @@ class Events(commands.Cog):
             # embeds the output to make it pretty
             style = discord.Embed(description=f"{output}" + f"\n\n- {np_str_clean} \n" + str(query[1]),
                                   colour=discord.Color.random())
-            #style.set_author(name=output)
+            # style.set_author(name=output)
             await ctx.reply(embed=style)
 
         except Exception:
@@ -120,7 +125,7 @@ class Events(commands.Cog):
 
     @commands.hybrid_command(name="random-quote")
     @commands.cooldown(1, 3, commands.BucketType.user)
-    async def rq(self, ctx: commands.Context):
+    async def rq(self, ctx: GuildContext):
         """
         This command will get a random quote from a random user.
         """

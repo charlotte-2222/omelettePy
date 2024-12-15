@@ -1,18 +1,11 @@
 import logging
 
 import aiohttp
-import bungio
 import discord
 from aiohttp.web_fileresponse import extension
 from discord.ext import commands
 
-from utilFunc.config import TOKEN, BNG_API_KEY, BNG_OAUTH_CLIENT_ID, BNG_OAUTH_URL
-
-bng_client=bungio.Client(
-    bungie_client_id=BNG_OAUTH_CLIENT_ID,
-    bungie_client_secret=BNG_OAUTH_URL,
-    bungie_token=BNG_API_KEY
-)
+from utilFunc.config import TOKEN
 
 
 class LoggingFormatter(logging.Formatter):
@@ -64,15 +57,13 @@ logger.addHandler(console_handler)
 logger.addHandler(file_handler)
 
 
-def _get_prefix(bot, message):
-    prefixes = ['^']
-    if not message.guild:
-        return ['?', '^']
-    return commands.when_mentioned_or(*prefixes)(bot, message)
+# def _get_prefix(bot, message):
+#     return commands.when_mentioned(bot, message)
 
 
 class OmelettePy(commands.AutoShardedBot):
     bot_app_info: discord.AppInfo
+    user: discord.ClientUser
     def __init__(self):
         allowed_mentions = discord.AllowedMentions(roles=False, everyone=False, users=True)
         intents = discord.Intents(
@@ -82,11 +73,12 @@ class OmelettePy(commands.AutoShardedBot):
             reactions=True,
             message_content=True
         )
-        super().__init__(command_prefix=_get_prefix,
+        super().__init__(command_prefix=commands.when_mentioned,
                          case_insensitive=True,
-                         strip_after_prefix=True,
+                         heartbeat_timeout=150.0,
                          intents=intents,
-                         allowed_mentions=allowed_mentions
+                         allowed_mentions=allowed_mentions,
+                         enable_debug_events=True
                          )
         self.initial_extensions=[
             'cogs.events',

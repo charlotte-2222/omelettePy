@@ -115,7 +115,7 @@ class HelpView(discord.ui.View):
             "Use the buttons to switch between file types and commands.",
             color=self.cog.embed_color)
         for category, commands in self.categories.items():
-            if category not in ["Home", "HelpCog"]:
+            if category not in ["Home", "Owner"]:
                 embed.add_field(name=f"**{category}**",
                                 value=f"`{len(commands)}` commands",
                                 inline=True)
