@@ -2,7 +2,9 @@
 
 *This is a simple todo list for brainstorming new implementations*
 
-- [X] Reminder Functions
+- [ ] Reminder Functions
+
+  *issues with time storing, review later - unmarked*
     - Store reminders in SQLite3 DB, fields like `user_id`, `reminder_text`, `time_to_trigger`, `channel_id`
     - Use Discord.ext.tasks and/or asyncio to check periodically for reminders that are due and send them (Prob via DM?)
     - Allow users to list, edit, delete existing reminders.

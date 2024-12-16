@@ -33,6 +33,10 @@ class Reminders(commands.Cog):
     def cog_unload(self) -> None:
         self.check_reminders.cancel()  # stop task if cog unloaded
 
+    """
+        Issues, return to later
+    """
+
     @app_commands.command(name="add_reminder", description="Set a reminder")
     @app_commands.describe(
         reminder_text="What do you want to be reminded about?",

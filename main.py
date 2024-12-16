@@ -3,10 +3,13 @@ from typing import Iterable, AsyncIterator
 
 import aiohttp
 import discord
-from aiohttp.web_fileresponse import extension
 from discord.ext import commands
 
-from utilFunc.config import TOKEN
+# ai shit
+from GPT.chatgpt import ChatGPT
+from GPT.memory import Memory
+from GPT.models import OpenAIModel
+from utilFunc.config import TOKEN, OPEN_AI_KEY, OPEN_AI_MODEL_ENGINE
 
 
 class LoggingFormatter(logging.Formatter):
@@ -57,6 +60,11 @@ file_handler.setFormatter(file_handler_formatter)
 logger.addHandler(console_handler)
 logger.addHandler(file_handler)
 
+models = OpenAIModel(api_key=OPEN_AI_KEY,
+                     model_engine=OPEN_AI_MODEL_ENGINE)
+memory = Memory(
+    system_message="You are an AI focused on assisting users with general utility functions in concise and easy to understand ways.")
+chatgpt = ChatGPT(models, memory)
 
 def get_prefix(bot, message):
     prefixes = ['>>']
@@ -93,7 +101,8 @@ class OmelettePy(commands.AutoShardedBot):
             'cogs.misc',
             'cogs.tictactoe',
             'cogs.git_stuff',
-            'cogs.reminders'
+            'cogs.reminders',
+            # 'cogs.gpt_cog'
         ]
     async def setup_hook(self) -> None:
         # self.background_tasks.start()
@@ -104,7 +113,7 @@ class OmelettePy(commands.AutoShardedBot):
             for ext in self.initial_extensions:
                 await self.load_extension(ext)
         except Exception as e:
-                logger.exception('Failed to load extension %s.',extension)
+            logger.exception('Failed to load extension %s.', e)
 
     @property
     def owner(self) -> discord.User:
@@ -168,6 +177,13 @@ class OmelettePy(commands.AutoShardedBot):
                 for member in members:
                     yield member
 
+    # async def main(self) -> None:
+    #     bot = OmelettePy()
+    #     await bot.start(TOKEN)
+    #
+    # if __name__ == "__main__":
+    #     import asyncio
+    #     asyncio.run(main())  # Use asyncio.run to start the bot
 
     async def close(self) -> None:
         await super().close()
