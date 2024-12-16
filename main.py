@@ -92,7 +92,8 @@ class OmelettePy(commands.AutoShardedBot):
             'cogs.tags',
             'cogs.misc',
             'cogs.tictactoe',
-            'cogs.git_stuff'
+            'cogs.git_stuff',
+            'cogs.reminders'
         ]
     async def setup_hook(self) -> None:
         # self.background_tasks.start()
