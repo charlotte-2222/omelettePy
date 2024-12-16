@@ -152,6 +152,7 @@ class Git(commands.Cog):
         await ctx.send(commit_info)
 
     @app_commands.command(name="create_issue", description="Create a new issue")
+    @commands.is_owner()  # maybe this works?
     @app_commands.describe(owner="Owner of the repository", repo="Name of the repository")
     async def create_issue(self, interaction: discord.Interaction, owner: str, repo: str):
         if not GITHUB_TOKEN:
