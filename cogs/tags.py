@@ -1,11 +1,14 @@
 import sqlite3
 import traceback
-from typing import Literal, Optional
+from typing import Literal, Optional, Annotated, TypedDict
 
 import discord
 import numpy as np
 from discord import app_commands
 from discord.ext import commands
+
+from utilFunc.context import GuildContext, Context
+from utilFunc.paginator import SimplePages
 
 """
 This is the tags cog.
@@ -23,6 +26,31 @@ cursor.execute(
 print("Loaded tags data set")
 db.commit()
 
+
+class TagEntry(TypedDict):
+    id: int
+    name: str
+    content: str
+
+
+class TagAllFlags(commands.FlagConverter):
+    text: bool = commands.flag(default=False, description='Whether to dump the tags as a text file.')
+
+
+class TagPageEntry:
+    __slots__ = ('id', 'name')
+
+    # def __init__(self, entry: TagEntry):
+    #    self.name: str = entry['name']
+
+    # def __str__(self) -> str:
+    #    return f'{self.name} (ID: {self.id})'
+
+
+class TagPages(SimplePages):
+    def __init__(self, entries: list[TagEntry], *, ctx: Context, per_page: int = 12):
+        converted = [TagPageEntry(entry) for entry in entries]
+        super().__init__(converted, per_page=per_page, ctx=ctx)
 
 class TagMakeModal(discord.ui.Modal, title='Create New Tag'):
     name = discord.ui.TextInput(label='Name',
@@ -133,6 +161,42 @@ class tags(commands.Cog):
                                f"***Did you mean...***\n"
                                f"{np_str_clean}")
         db.commit()
+
+    @commands.hybrid_command(name="search-tags")
+    @commands.cooldown(1, 3, commands.BucketType.user)
+    async def tag_search(self, ctx: GuildContext, *, query: Annotated[str, commands.clean_content]):
+        """searches for a tag
+        query must be at least 3 characters long
+        """
+
+        guild = ctx.guild
+
+        if len(query) < 3:
+            return await ctx.send('The query length must be at least 3 characters long.')
+
+        cursor.execute(
+            "SELECT tag_name FROM tag_list WHERE tag_name LIKE (?) AND guild_id =? ORDER BY tag_name DESC LIMIT 100 ",
+            ("%" + query + "%", guild.id))
+
+        result = cursor.fetchall()
+        np_query = np.array(result)
+        np_str_query = np.array2string(np_query, separator=', ')
+        np_str_clean = ((np_str_query.replace('[', '').
+                         replace(']', '')).
+                        replace("'", ''))
+
+        # if result:
+        #     p = TagPages(entries=result, per_page=20, ctx=ctx)
+        #     await p.start()
+        # else:
+        #     await ctx.send('No tags found.')
+
+        embed = discord.Embed(title=f'Search Results for {query}',
+                              description=f"{np_str_clean}\n\n*Run the tag command to use one.*",
+                              color=discord.Color.blurple())
+
+        await ctx.send(embed=embed)
+
 
     @commands.command(hidden=True)
     @commands.guild_only()
