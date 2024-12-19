@@ -8,7 +8,6 @@ import textwrap
 from typing import TYPE_CHECKING, Any, Optional, Sequence, NamedTuple
 
 import asyncpg
-# TODO: replace with ZoneInfo when upgrading to 3.9
 import dateutil.tz
 import discord
 from dateutil.zoneinfo import get_zonefile_instance
@@ -684,9 +683,9 @@ class Reminder(commands.Cog):
         if total == 0:
             return await ctx.send('You do not have any reminders to delete.')
 
-        confirm = await ctx.prompt(f'Are you sure you want to delete {formats.plural(total):reminder}?')
-        if not confirm:
-            return await ctx.send('Aborting', ephemeral=True)
+        # confirm = await ctx.prompt(f'Are you sure you want to delete {formats.plural(total):reminder}?')
+        # if not confirm:
+        #     return await ctx.send('Aborting', ephemeral=True)
 
         query = """DELETE FROM reminders WHERE event = 'reminder' AND extra #>> '{args,0}' = $1;"""
         await self.db.execute(query, author_id)

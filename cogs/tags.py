@@ -287,7 +287,7 @@ class Tags(commands.Cog):
                 await ctx.send('Could not create tag.')
             else:
                 await tr.commit()
-                await ctx.send(f'Tag {name} successfully created.')
+                # await ctx.send(f'Tag {name} successfully created.')
 
     # def is_tag_being_made(self, guild_id: int, name: str) -> bool:
     #     try:

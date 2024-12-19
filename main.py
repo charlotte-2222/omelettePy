@@ -109,6 +109,7 @@ class OmelettePy(commands.AutoShardedBot):
             'cogs.tictactoe',
             'cogs.git_stuff',
             'cogs.reminders',
+            'cogs.api',
             # 'cogs.gpt_cog'
         ]
     async def setup_hook(self) -> None:
