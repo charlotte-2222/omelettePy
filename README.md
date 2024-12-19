@@ -5,9 +5,12 @@ A Discord Utility bot, by [Charlotte](https://github.com/charlotte-2222)
 
 ### Key Features
 - **Slash Command/**[**app_commands**](https://discordpy.readthedocs.io/en/stable/interactions/api.html?highlight=app_commands#discord.app_commands.AppCommand) **enabled!**
-- **SQLite3 database**
+- GitHub API Features (Search, View Issues, Latest Commit)
+- Tagging system: Store important information per-server via tags!
+
+**SQLite3 database**
   -
-  For [quotes](https://github.com/charlotte-2222/omelettePy/blob/master/cogs/events.py#L41), [tags](https://github.com/charlotte-2222/omelettePy/blob/master/cogs/tags.py#L67)
+For [quotes](https://github.com/charlotte-2222/omelettePy/blob/master/cogs/events.py#L41), [tags](https://github.com/charlotte-2222/omelettePy/blob/master/cogs/tags.py#L67)
   and [reminders!](https://github.com/charlotte-2222/omelettePy/blob/master/cogs/reminders.py)
 - **Scalability**
 - **Ease of use**

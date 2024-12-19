@@ -9,7 +9,7 @@ from discord.ext import commands
 if TYPE_CHECKING:
     from main import OmelettePy
     from aiohttp import ClientSession
-    from sqlite3 import Pool, Connection
+    from asyncpg import Pool, Connection
     from types import TracebackType
 
 

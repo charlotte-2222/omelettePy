@@ -7,10 +7,7 @@ from typing import Any, Callable, Coroutine, MutableMapping, TypeVar, Protocol
 
 import time
 
-# from lru import LRU
-
 R = TypeVar('R')
-
 
 # Can't use ParamSpec due to https://github.com/python/typing/discussions/946
 class CacheProtocol(Protocol[R]):
@@ -82,18 +79,18 @@ def cache(
 ) -> Callable[[Callable[..., Coroutine[Any, Any, R]]], CacheProtocol[R]]:
     def decorator(func: Callable[..., Coroutine[Any, Any, R]]) -> CacheProtocol[R]:
         if strategy is Strategy.lru:
-            _internal_cache = LRU(maxsize)
-            _stats = _internal_cache.get_stats
+            # Replace functools.lru_cache usage with ExpiringCache
+            _internal_cache = ExpiringCache(seconds=maxsize)
+            _stats = lambda: (0, len(_internal_cache))  # Example stats: no current hits tracking
         elif strategy is Strategy.raw:
             _internal_cache = {}
-            _stats = lambda: (0, 0)
+            _stats = lambda: (0, len(_internal_cache))
         elif strategy is Strategy.timed:
             _internal_cache = ExpiringCache(maxsize)
-            _stats = lambda: (0, 0)
+            _stats = lambda: (0, len(_internal_cache))
 
         def _make_key(args: tuple[Any, ...], kwargs: dict[str, Any]) -> str:
-            # this is a bit of a cluster fuck
-            # we do care what 'self' parameter is when we __repr__ it
+            # Same key generation logic as before
             def _true_repr(o):
                 if o.__class__.__repr__ is object.__repr__:
                     return f'<{o.__class__.__module__}.{o.__class__.__name__}>'
@@ -103,13 +100,6 @@ def cache(
             key.extend(_true_repr(o) for o in args)
             if not ignore_kwargs:
                 for k, v in kwargs.items():
-                    # note: this only really works for this use case in particular
-                    # I want to pass asyncpg.Connection objects to the parameters
-                    # however, they use default __repr__ and I do not care what
-                    # connection is passed in, so I needed a bypass.
-                    if k == 'connection' or k == 'pool':
-                        continue
-
                     key.append(_true_repr(k))
                     key.append(_true_repr(v))
 
@@ -119,11 +109,9 @@ def cache(
         def wrapper(*args: Any, **kwargs: Any):
             key = _make_key(args, kwargs)
             try:
-                task = _internal_cache[key]
+                return _internal_cache[key]
             except KeyError:
                 _internal_cache[key] = task = asyncio.create_task(func(*args, **kwargs))
-                return task
-            else:
                 return task
 
         def _invalidate(*args: Any, **kwargs: Any) -> bool:
@@ -131,8 +119,7 @@ def cache(
                 del _internal_cache[_make_key(args, kwargs)]
             except KeyError:
                 return False
-            else:
-                return True
+            return True
 
         def _invalidate_containing(key: str) -> None:
             to_remove = []

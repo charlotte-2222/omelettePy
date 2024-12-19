@@ -1,7 +1,10 @@
+from __future__ import annotations
+
 import logging
-from typing import Iterable, AsyncIterator
+from typing import Iterable, AsyncIterator, TYPE_CHECKING
 
 import aiohttp
+import asyncpg
 import discord
 from discord.ext import commands
 
@@ -10,6 +13,9 @@ from GPT.chatgpt import ChatGPT
 from GPT.memory import Memory
 from GPT.models import OpenAIModel
 from utilFunc.config import TOKEN, OPEN_AI_KEY, OPEN_AI_MODEL_ENGINE
+
+if TYPE_CHECKING:
+    pass
 
 
 class LoggingFormatter(logging.Formatter):
@@ -76,6 +82,7 @@ def get_prefix(bot, message):
 class OmelettePy(commands.AutoShardedBot):
     bot_app_info: discord.AppInfo
     user: discord.ClientUser
+    pool: asyncpg.Pool
     def __init__(self):
         allowed_mentions = discord.AllowedMentions(roles=False, everyone=False, users=True)
         intents = discord.Intents(
@@ -177,13 +184,9 @@ class OmelettePy(commands.AutoShardedBot):
                 for member in members:
                     yield member
 
-    # async def main(self) -> None:
-    #     bot = OmelettePy()
-    #     await bot.start(TOKEN)
-    #
-    # if __name__ == "__main__":
-    #     import asyncio
-    #     asyncio.run(main())  # Use asyncio.run to start the bot
+    # async def get_context(self, origin: Union[discord.Interaction, discord.Message], /, *, cls=Context) -> Context:
+    # return await super().get_context(origin, cls=cls)
+
 
     async def close(self) -> None:
         await super().close()
