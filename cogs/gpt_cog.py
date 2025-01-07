@@ -3,7 +3,7 @@ import openai
 from discord import app_commands
 from discord.ext import commands
 
-from main import chatgpt
+from bot import chatgpt
 from utilFunc.config import OPEN_AI_KEY
 
 # from GPT.api_access import *

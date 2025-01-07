@@ -7,7 +7,7 @@ import discord
 from discord.ext import commands
 
 if TYPE_CHECKING:
-    from main import OmelettePy
+    from bot import OmelettePy
     from aiohttp import ClientSession
     from asyncpg import Pool, Connection
     from types import TracebackType

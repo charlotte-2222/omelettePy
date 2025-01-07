@@ -6,6 +6,7 @@ import re
 import zlib
 from typing import TYPE_CHECKING, Generator, NamedTuple, Optional, Union
 
+import asyncpg
 import discord
 import lxml.etree as etree
 from discord import app_commands
@@ -16,6 +17,9 @@ from utilFunc import fuzzy
 if TYPE_CHECKING:
     from utilFunc.context import Context, GuildContext
     from asyncpg import Record
+
+# taken from Rapptz/Robodanny, removing a lot of things I don't necessarily need however.
+# Useful functions that fulfill the desired role of the bot.
 
 DISCORD_API_ID = 81384788765712384
 DISCORD_BOTS_ID = 110373943822540800
@@ -108,6 +112,14 @@ class API(commands.Cog):
         self.bot: commands.Bot = bot
         self.issue = re.compile(r'##(?P<number>[0-9]+)')
 
+    async def cog_load(self) -> None:
+        self.db = await asyncpg.connect(database="OmelettePy",
+                                        user="postgres",
+                                        password="Astra",
+                                        host="localhost",
+                                        port=5432
+                                        )
+
     @property
     def display_emoji(self) -> discord.PartialEmoji:
         return discord.PartialEmoji(name='\N{PERSONAL COMPUTER}')
@@ -116,10 +128,6 @@ class API(commands.Cog):
     async def on_member_join(self, member: discord.Member):
         if member.guild.id != DISCORD_API_ID:
             return
-
-        if member.bot:
-            role = discord.Object(id=USER_BOTS_ROLE)
-            await member.add_roles(role)
 
     def parse_object_inv(self, stream: SphinxObjectFileReader, url: str) -> dict[str, str]:
         # key: URL
@@ -220,9 +228,9 @@ class API(commands.Cog):
         e.description = '\n'.join(f'[`{key}`]({url})' for key, url in matches)
         await ctx.send(embed=e, reference=ctx.message.reference)
 
-        if ctx.guild and ctx.guild.id in (DISCORD_API_ID, DISCORD_PY_GUILD):
+        if ctx.guild and ctx.guild.id in DISCORD_API_ID:
             query = 'INSERT INTO rtfm (user_id) VALUES ($1) ON CONFLICT (user_id) DO UPDATE SET count = rtfm.count + 1;'
-            await ctx.db.execute(query, ctx.author.id)
+            await self.db.execute(query, ctx.author.id)
 
     def transform_rtfm_language_key(self, ctx: Union[discord.Interaction, Context], prefix: str):
         if ctx.guild is not None:
@@ -318,7 +326,7 @@ class API(commands.Cog):
         e.set_author(name=str(member), icon_url=member.display_avatar.url)
 
         query = 'SELECT count FROM rtfm WHERE user_id=$1;'
-        record = await ctx.db.fetchrow(query, member.id)
+        record = await self.db.fetchrow(query, member.id)
 
         if record is None:
             count = 0
@@ -335,14 +343,14 @@ class API(commands.Cog):
     async def stats(self, ctx: Context, *, member: discord.Member = None):
         """Shows statistics on RTFM usage on a member or the server."""
         query = 'SELECT SUM(count) AS total_uses FROM rtfm;'
-        record: Record = await ctx.db.fetchrow(query)
+        record: Record = await self.db.fetchrow(query)
         total_uses: int = record['total_uses']
 
         if member is not None:
             return await self._member_stats(ctx, member, total_uses)
 
         query = 'SELECT user_id, count FROM rtfm ORDER BY count DESC LIMIT 10;'
-        records: list[Record] = await ctx.db.fetch(query)
+        records: list[Record] = await self.db.fetch(query)
 
         output = []
         output.append(f'**Total uses**: {total_uses}')

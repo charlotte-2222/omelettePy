@@ -21,6 +21,7 @@ from utilFunc import time, formats, cache, fuzzy
 if TYPE_CHECKING:
     from typing_extensions import Self
     from utilFunc.context import Context
+    from bot import OmelettePy
 
 
 class MaybeAcquire:
@@ -140,9 +141,9 @@ class Timer:
     __slots__ = ('args', 'kwargs', 'event', 'id', 'created_at', 'expires', 'timezone')
 
     def __init__(self, *, record: asyncpg.Record):
-        self.id: int = record['id']
-
-        extra = record['extra']
+        # Extract intermediate variables for clarity
+        self.id: Optional[int] = record.get('id')
+        extra: dict = record['extra']  # Simplify access to nested 'extra' field
         self.args: Sequence[Any] = extra.get('args', [])
         self.kwargs: dict[str, Any] = extra.get('kwargs', {})
         self.event: str = record['event']
@@ -151,7 +152,7 @@ class Timer:
         self.timezone: str = record['timezone']
 
     @classmethod
-    def temporary(
+    def from_temporary_data(
             cls,
             *,
             expires: datetime.datetime,
@@ -161,7 +162,29 @@ class Timer:
             kwargs: dict[str, Any],
             timezone: str,
     ) -> Self:
-        pseudo = {
+        # Delegate pseudo-record creation and use it directly
+        timer_record = cls._create_pseudo_record(
+            expires=expires,
+            created=created,
+            event=event,
+            args=args,
+            kwargs=kwargs,
+            timezone=timezone
+        )
+        return cls(record=timer_record)
+
+    @staticmethod
+    def _create_pseudo_record(
+            *,
+            expires: datetime.datetime,
+            created: datetime.datetime,
+            event: str,
+            args: Sequence[Any],
+            kwargs: dict[str, Any],
+            timezone: str,
+    ) -> dict:
+        """Helper method to craft a pseudo record for temporary Timer instances."""
+        return {
             'id': None,
             'extra': {'args': args, 'kwargs': kwargs},
             'event': event,
@@ -169,15 +192,14 @@ class Timer:
             'expires': expires,
             'timezone': timezone,
         }
-        return cls(record=pseudo)
 
     def __eq__(self, other: object) -> bool:
-        try:
-            return self.id == other.id  # type: ignore
-        except AttributeError:
-            return False
+        if not isinstance(other, Timer):
+            return NotImplemented
+        return self.id == other.id
 
     def __hash__(self) -> int:
+        # Use None-safe hash for `id`
         return hash(self.id)
 
     @property
@@ -186,12 +208,14 @@ class Timer:
 
     @property
     def author_id(self) -> Optional[int]:
-        if self.args:
-            return int(self.args[0])
-        return None
+        return int(self.args[0]) if self.args else None
 
     def __repr__(self) -> str:
-        return f'<Timer created={self.created_at} expires={self.expires} event={self.event}>'
+        return (
+            f'<Timer created={self.created_at.isoformat()} '
+            f'expires={self.expires.isoformat()} event={self.event!r}>'
+        )
+
 
 
 class CLDRDataEntry(NamedTuple):
@@ -239,9 +263,9 @@ class Reminder(commands.Cog):
         'cnsha',  # Asia/Shanghai
     )
 
-    def __init__(self, bot: commands.Bot) -> None:
+    def __init__(self, bot: OmelettePy) -> None:
         self.db = None
-        self.bot: commands.Bot = bot
+        self.bot: OmelettePy = bot
         self._have_data = asyncio.Event()
         self._current_timer: Optional[Timer] = None
         self._task = bot.loop.create_task(self.dispatch_timers())
@@ -278,7 +302,7 @@ class Reminder(commands.Cog):
         return discord.PartialEmoji(name='\N{ALARM CLOCK}')
 
     def cog_unload(self) -> None:
-        self._task.cancel()
+        self._task.stop()
 
     async def cog_command_error(self, ctx: Context, error: commands.CommandError):
         if isinstance(error, commands.BadArgument):
@@ -349,6 +373,7 @@ class Reminder(commands.Cog):
         keys = fuzzy.finder(query, self._timezone_aliases.keys())
         return [TimeZone(label=k, key=self._timezone_aliases[k]) for k in keys]
 
+
     async def get_active_timer(self, *, connection: Optional[asyncpg.Connection] = None, days: int = 7) -> Optional[
         Timer]:
         query = """
@@ -392,7 +417,7 @@ class Reminder(commands.Cog):
                 # so we're gonna cap it off at 40 days
                 # see: http://bugs.python.org/issue20493
                 timer = self._current_timer = await self.wait_for_active_timers(days=40)
-                now = datetime.datetime.utcnow()
+                now = discord.utils.utcnow()
 
                 if timer.expires >= now:
                     to_sleep = (timer.expires - now).total_seconds()
