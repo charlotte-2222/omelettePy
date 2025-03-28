@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import datetime
-import json
 import random
 import textwrap
 from typing import TYPE_CHECKING, Any, Optional, Sequence, NamedTuple
@@ -141,9 +140,9 @@ class Timer:
     __slots__ = ('args', 'kwargs', 'event', 'id', 'created_at', 'expires', 'timezone')
 
     def __init__(self, *, record: asyncpg.Record):
-        # Extract intermediate variables for clarity
-        self.id: Optional[int] = record.get('id')
-        extra: dict = record['extra']  # Simplify access to nested 'extra' field
+        self.id: int = record['id']
+
+        extra = record['extra']
         self.args: Sequence[Any] = extra.get('args', [])
         self.kwargs: dict[str, Any] = extra.get('kwargs', {})
         self.event: str = record['event']
@@ -152,7 +151,7 @@ class Timer:
         self.timezone: str = record['timezone']
 
     @classmethod
-    def from_temporary_data(
+    def temporary(
             cls,
             *,
             expires: datetime.datetime,
@@ -162,29 +161,7 @@ class Timer:
             kwargs: dict[str, Any],
             timezone: str,
     ) -> Self:
-        # Delegate pseudo-record creation and use it directly
-        timer_record = cls._create_pseudo_record(
-            expires=expires,
-            created=created,
-            event=event,
-            args=args,
-            kwargs=kwargs,
-            timezone=timezone
-        )
-        return cls(record=timer_record)
-
-    @staticmethod
-    def _create_pseudo_record(
-            *,
-            expires: datetime.datetime,
-            created: datetime.datetime,
-            event: str,
-            args: Sequence[Any],
-            kwargs: dict[str, Any],
-            timezone: str,
-    ) -> dict:
-        """Helper method to craft a pseudo record for temporary Timer instances."""
-        return {
+        pseudo = {
             'id': None,
             'extra': {'args': args, 'kwargs': kwargs},
             'event': event,
@@ -192,14 +169,15 @@ class Timer:
             'expires': expires,
             'timezone': timezone,
         }
+        return cls(record=pseudo)
 
     def __eq__(self, other: object) -> bool:
-        if not isinstance(other, Timer):
-            return NotImplemented
-        return self.id == other.id
+        try:
+            return self.id == other.id  # type: ignore
+        except AttributeError:
+            return False
 
     def __hash__(self) -> int:
-        # Use None-safe hash for `id`
         return hash(self.id)
 
     @property
@@ -208,14 +186,12 @@ class Timer:
 
     @property
     def author_id(self) -> Optional[int]:
-        return int(self.args[0]) if self.args else None
+        if self.args:
+            return int(self.args[0])
+        return None
 
     def __repr__(self) -> str:
-        return (
-            f'<Timer created={self.created_at.isoformat()} '
-            f'expires={self.expires.isoformat()} event={self.event!r}>'
-        )
-
+        return f'<Timer created={self.created_at} expires={self.expires} event={self.event}>'
 
 
 class CLDRDataEntry(NamedTuple):
@@ -263,8 +239,7 @@ class Reminder(commands.Cog):
         'cnsha',  # Asia/Shanghai
     )
 
-    def __init__(self, bot: OmelettePy) -> None:
-        self.db = None
+    def __init__(self, bot: OmelettePy):
         self.bot: OmelettePy = bot
         self._have_data = asyncio.Event()
         self._current_timer: Optional[Timer] = None
@@ -289,12 +264,6 @@ class Reminder(commands.Cog):
         self._default_timezones: list[app_commands.Choice[str]] = []
 
     async def cog_load(self) -> None:
-        self.db = await asyncpg.connect(database="OmelettePy",
-                                        user="postgres",
-                                        password="Astra",
-                                        host="localhost",
-                                        port=5432
-                                        )
         await self.parse_bcp47_timezones()
 
     @property
@@ -302,7 +271,7 @@ class Reminder(commands.Cog):
         return discord.PartialEmoji(name='\N{ALARM CLOCK}')
 
     def cog_unload(self) -> None:
-        self._task.stop()
+        self._task.cancel()
 
     async def cog_command_error(self, ctx: Context, error: commands.CommandError):
         if isinstance(error, commands.BadArgument):
@@ -354,8 +323,8 @@ class Reminder(commands.Cog):
 
     @cache.cache()
     async def get_timezone(self, user_id: int, /) -> Optional[str]:
-        query = 'SELECT timezone FROM user_settings WHERE id = $1;'
-        record = await self.db.fetchrow(query, user_id)
+        query = "SELECT timezone from user_settings WHERE id = $1;"
+        record = await self.bot.pool.fetchrow(query, user_id)
         return record['timezone'] if record else None
 
     async def get_tzinfo(self, user_id: int, /) -> datetime.tzinfo:
@@ -373,7 +342,6 @@ class Reminder(commands.Cog):
         keys = fuzzy.finder(query, self._timezone_aliases.keys())
         return [TimeZone(label=k, key=self._timezone_aliases[k]) for k in keys]
 
-
     async def get_active_timer(self, *, connection: Optional[asyncpg.Connection] = None, days: int = 7) -> Optional[
         Timer]:
         query = """
@@ -382,13 +350,13 @@ class Reminder(commands.Cog):
             ORDER BY expires
             LIMIT 1;
         """
-        con = connection or self.db
+        con = connection or self.bot.pool
 
         record = await con.fetchrow(query, datetime.timedelta(days=days))
         return Timer(record=record) if record else None
 
     async def wait_for_active_timers(self, *, connection: Optional[asyncpg.Connection] = None, days: int = 7) -> Timer:
-        async with MaybeAcquire(connection=connection, pool=self.db) as con:
+        async with MaybeAcquire(connection=connection, pool=self.bot.pool) as con:
             timer = await self.get_active_timer(connection=con, days=days)
             if timer is not None:
                 self._have_data.set()
@@ -404,7 +372,7 @@ class Reminder(commands.Cog):
     async def call_timer(self, timer: Timer) -> None:
         # delete the timer
         query = "DELETE FROM reminders WHERE id=$1;"
-        await self.db.execute(query, timer.id)
+        await self.bot.pool.execute(query, timer.id)
 
         # dispatch the event
         event_name = f'{timer.event}_timer_complete'
@@ -417,7 +385,7 @@ class Reminder(commands.Cog):
                 # so we're gonna cap it off at 40 days
                 # see: http://bugs.python.org/issue20493
                 timer = self._current_timer = await self.wait_for_active_timers(days=40)
-                now = discord.utils.utcnow()
+                now = datetime.datetime.utcnow()
 
                 if timer.expires >= now:
                     to_sleep = (timer.expires - now).total_seconds()
@@ -456,7 +424,7 @@ class Reminder(commands.Cog):
         filtered_clause = [f"extra #>> ARRAY['kwargs', '{key}'] = ${i}" for (i, key) in
                            enumerate(kwargs.keys(), start=2)]
         query = f"SELECT * FROM reminders WHERE event = $1 AND {' AND '.join(filtered_clause)} LIMIT 1"
-        record = await self.db.fetchrow(query, event, *kwargs.values())
+        record = await self.bot.pool.fetchrow(query, event, *kwargs.values())
         return Timer(record=record) if record else None
 
     async def delete_timer(self, event: str, /, **kwargs: Any) -> None:
@@ -475,7 +443,7 @@ class Reminder(commands.Cog):
         filtered_clause = [f"extra #>> ARRAY['kwargs', '{key}'] = ${i}" for (i, key) in
                            enumerate(kwargs.keys(), start=2)]
         query = f"DELETE FROM reminders WHERE event = $1 AND {' AND '.join(filtered_clause)} RETURNING id"
-        record: Any = await self.db.fetchrow(query, event, *kwargs.values())
+        record: Any = await self.bot.pool.fetchrow(query, event, *kwargs.values())
 
         # if the current timer is being deleted
         if record is not None and self._current_timer and self._current_timer.id == record['id']:
@@ -517,7 +485,7 @@ class Reminder(commands.Cog):
         :class:`Timer`
         """
 
-        pool = self.db
+        pool = self.bot.pool
 
         try:
             now = kwargs.pop('created')
@@ -537,15 +505,12 @@ class Reminder(commands.Cog):
             self.bot.loop.create_task(self.short_timer_optimisation(delta, timer))
             return timer
 
-        # serialize into json
-        extra = json.dumps({'args': args, 'kwargs': kwargs})
-
         query = """INSERT INTO reminders (event, extra, expires, created, timezone)
                    VALUES ($1, $2::jsonb, $3, $4, $5)
                    RETURNING id;
                 """
 
-        row = await self.db.fetchrow(query, event, extra, when, now, timezone_name)
+        row = await pool.fetchrow(query, event, {'args': args, 'kwargs': kwargs}, when, now, timezone_name)
         timer.id = row[0]
 
         # only set the data check if it can be waited on
@@ -645,7 +610,7 @@ class Reminder(commands.Cog):
                    LIMIT 10;
                 """
 
-        records = await self.db.fetch(query, str(ctx.author.id))
+        records = await ctx.db.fetch(query, str(ctx.author.id))
 
         if len(records) == 0:
             return await ctx.send('No currently running reminders.')
@@ -678,7 +643,7 @@ class Reminder(commands.Cog):
                    AND extra #>> '{args,0}' = $2;
                 """
 
-        status = await self.db.execute(query, id, str(ctx.author.id))
+        status = await ctx.db.execute(query, id, str(ctx.author.id))
         if status == 'DELETE 0':
             return await ctx.send('Could not delete any reminders with that ID.')
 
@@ -703,17 +668,17 @@ class Reminder(commands.Cog):
                 """
 
         author_id = str(ctx.author.id)
-        total: asyncpg.Record = await self.db.fetchrow(query, author_id)
+        total: asyncpg.Record = await ctx.db.fetchrow(query, author_id)
         total = total[0]
         if total == 0:
             return await ctx.send('You do not have any reminders to delete.')
 
-        # confirm = await ctx.prompt(f'Are you sure you want to delete {formats.plural(total):reminder}?')
-        # if not confirm:
-        #     return await ctx.send('Aborting', ephemeral=True)
+        confirm = await ctx.prompt(f'Are you sure you want to delete {formats.plural(total):reminder}?')
+        if not confirm:
+            return await ctx.send('Aborting', ephemeral=True)
 
         query = """DELETE FROM reminders WHERE event = 'reminder' AND extra #>> '{args,0}' = $1;"""
-        await self.db.execute(query, author_id)
+        await ctx.db.execute(query, author_id)
 
         # Check if the current timer is the one being cleared and cancel it if so
         if self._current_timer and self._current_timer.author_id == ctx.author.id:
@@ -737,7 +702,7 @@ class Reminder(commands.Cog):
         such as tempblock, tempmute, etc.
         """
 
-        await self.db.execute(
+        await ctx.db.execute(
             """INSERT INTO user_settings (id, timezone)
                VALUES ($1, $2)
                ON CONFLICT (id) DO UPDATE SET timezone = $2;
@@ -798,7 +763,7 @@ class Reminder(commands.Cog):
     @timezone.command(name='clear')
     async def timezone_clear(self, ctx: Context):
         """Clears your timezone."""
-        await self.db.execute("UPDATE user_settings SET timezone = NULL WHERE id=$1", ctx.author.id)
+        await ctx.db.execute("UPDATE user_settings SET timezone = NULL WHERE id=$1", ctx.author.id)
         self.get_timezone.invalidate(self, ctx.author.id)
         await ctx.send('Your timezone has been cleared.', ephemeral=True)
 
@@ -829,5 +794,5 @@ class Reminder(commands.Cog):
                 view.message = msg
 
 
-async def setup(bot: commands.Bot) -> None:
+async def setup(bot):
     await bot.add_cog(Reminder(bot))

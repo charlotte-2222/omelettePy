@@ -3,9 +3,10 @@ from __future__ import annotations
 import contextlib
 import datetime
 import logging
+import logging.handlers
 import sys
 from collections import defaultdict
-from logging.handlers import RotatingFileHandler
+from logging import exception
 from typing import Iterable, AsyncIterator, TYPE_CHECKING, Optional, Any, Union
 
 import aiohttp
@@ -14,11 +15,7 @@ import click
 import discord
 from discord.ext import commands
 
-# ai shit
-from GPT.chatgpt import ChatGPT
-from GPT.memory import Memory
-from GPT.models import OpenAIModel
-from utilFunc.config import TOKEN, OPEN_AI_KEY, OPEN_AI_MODEL_ENGINE
+from utilFunc.config import TOKEN
 from utilFunc.context import Context
 
 if TYPE_CHECKING:
@@ -30,7 +27,8 @@ description = """
 I'm a general purpose bot written in Python by Charlotte. I'm still in development, but I hope to add a lot of new features!
 """
 
-log = logging.getLogger(__name__)
+log = logging.getLogger('discord')
+
 
 initial_extensions = [
     'cogs.events',
@@ -60,16 +58,18 @@ class RemoveNoise(logging.Filter):
 def setup_logging():
     log = logging.getLogger()
     try:
-        discord.utils.setup_logging()
+        # discord.utils.setup_logging()
         # __enter__
-        max_bytes = 32 * 1024 * 1024  # 32 MiB
         logging.getLogger('discord').setLevel(logging.INFO)
         logging.getLogger('discord.http').setLevel(logging.WARNING)
         logging.getLogger('discord.state').addFilter(RemoveNoise())
 
         log.setLevel(logging.INFO)
-        handler = RotatingFileHandler(filename='ommiepy.log', encoding='utf-8', mode='w', maxBytes=max_bytes,
-                                      backupCount=5)
+        handler = logging.handlers.RotatingFileHandler(filename='ommiepy.log',
+                                                       encoding='utf-8',
+                                                       maxBytes=32 * 1024 * 1024,  # 32 MiB
+                                                       backupCount=5,  # Rotate through 5 files
+                                                       )
         dt_fmt = '%Y-%m-%d %H:%M:%S'
         fmt = logging.Formatter('[{asctime}] [{levelname:<7}] {name}: {message}', dt_fmt, style='{')
         handler.setFormatter(fmt)
@@ -85,20 +85,17 @@ def setup_logging():
 
 
 async def create_pool() -> asyncpg.Pool:
-    return await asyncpg.create_pool(
-        database="OmelettePy",
-        user="postgres",
-        password="Astra",
-        host="localhost",
-        port=5432
-    )
+    try:
+        return await asyncpg.create_pool(
+            database="OmelettePy",
+            user="postgres",
+            password="Astra",
+            host="localhost",
+            port=5432
+        )
+    except exception as e:
+        print(f"Failed to create DB pool: {e}")
 
-
-models = OpenAIModel(api_key=OPEN_AI_KEY,
-                     model_engine=OPEN_AI_MODEL_ENGINE)
-memory = Memory(
-    system_message="You are an AI focused on assisting users with general utility functions in concise and easy to understand ways.")
-chatgpt = ChatGPT(models, memory)
 
 
 def _prefix_callable(bot: OmelettePy, msg: discord.Message):
@@ -109,11 +106,12 @@ def _prefix_callable(bot: OmelettePy, msg: discord.Message):
 
 
 class OmelettePy(commands.AutoShardedBot):
+    pool: asyncpg.Pool
+    bot_app_info: discord.AppInfo
+    user: discord.ClientUser
+    logging_handler: Any
+
     def __init__(self):
-        bot_app_info: discord.AppInfo
-        user: discord.ClientUser
-        pool: asyncpg.Pool
-        logging_handler: Any
         allowed_mentions = discord.AllowedMentions(roles=False, everyone=False, users=True)
         intents = discord.Intents(
             guilds=True,
@@ -135,6 +133,7 @@ class OmelettePy(commands.AutoShardedBot):
         self.resumes: defaultdict[int, list[datetime.datetime]] = defaultdict(list)
         self.identifies: defaultdict[int, list[datetime.datetime]] = defaultdict(list)
 
+
     async def setup_hook(self) -> None:
         self.session = aiohttp.ClientSession()
         self.bot_app_info = await self.application_info()
@@ -145,7 +144,8 @@ class OmelettePy(commands.AutoShardedBot):
             try:
                 await self.load_extension(extension)
             except Exception as e:
-                log.exception('Failed to load extension %s.', extension + f'\n{e}')
+                self.log.exception('Failed to load extension %s.',
+                                   extension + f'\n{e}')
 
         try:
             pool = await create_pool()
@@ -155,6 +155,8 @@ class OmelettePy(commands.AutoShardedBot):
             return
 
         bot.pool = pool
+        #self.start_tasks()
+
 
     @property
     def owner(self) -> discord.User:
@@ -332,11 +334,5 @@ class OmelettePy(commands.AutoShardedBot):
         return self.get_cog('Config')  # type: ignore
 
 
-
-
 bot = OmelettePy()
-bot.run(TOKEN)
-
-
-
-
+bot.run(TOKEN, log_handler=None)
