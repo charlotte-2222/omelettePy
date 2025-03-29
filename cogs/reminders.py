@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import datetime
+import json
 import random
 import textwrap
 from typing import TYPE_CHECKING, Any, Optional, Sequence, NamedTuple
@@ -26,14 +27,14 @@ if TYPE_CHECKING:
 class MaybeAcquire:
     def __init__(self, connection: Optional[asyncpg.Connection], *, pool: asyncpg.Pool) -> None:
         self._connection: Optional[asyncpg.Connection] = connection
-        self.pool: asyncpg.Pool = pool
+        self.pool = pool
         self._cleanup: bool = False
 
     async def __aenter__(self) -> asyncpg.Connection:
         if self._connection is None:
             self._cleanup = True
-            self._connection = c = await self.pool.acquire()
-            return c
+            self._connection = await self.pool.acquire()
+            return self._connection
         return self._connection
 
     async def __aexit__(self, *args) -> None:
@@ -143,6 +144,10 @@ class Timer:
         self.id: int = record['id']
 
         extra = record['extra']
+        # Parse the extra data
+        if isinstance(extra, str):
+            extra = json.loads(extra)
+
         self.args: Sequence[Any] = extra.get('args', [])
         self.kwargs: dict[str, Any] = extra.get('kwargs', {})
         self.event: str = record['event']
@@ -239,8 +244,9 @@ class Reminder(commands.Cog):
         'cnsha',  # Asia/Shanghai
     )
 
-    def __init__(self, bot: OmelettePy):
+    def __init__(self, bot: OmelettePy) -> None:
         self.bot: OmelettePy = bot
+        self.pool = bot.pool
         self._have_data = asyncio.Event()
         self._current_timer: Optional[Timer] = None
         self._task = bot.loop.create_task(self.dispatch_timers())
@@ -264,14 +270,25 @@ class Reminder(commands.Cog):
         self._default_timezones: list[app_commands.Choice[str]] = []
 
     async def cog_load(self) -> None:
-        await self.parse_bcp47_timezones()
+        try:
+            await self.parse_bcp47_timezones()
+            self._task = self.bot.loop.create_task(self.dispatch_timers())
+            self.bot.log.info('Reminder system initialized')
+        except Exception as e:
+            self.bot.log.error(f'Error initializing reminder system: {e}')
+            raise
 
-    @property
-    def display_emoji(self) -> discord.PartialEmoji:
-        return discord.PartialEmoji(name='\N{ALARM CLOCK}')
-
-    def cog_unload(self) -> None:
-        self._task.cancel()
+    async def cog_unload(self) -> None:
+        # Gracefully stop the timer dispatch task
+        if hasattr(self, '_task'):
+            self._task.cancel()
+            try:
+                await self._task
+            except asyncio.CancelledError:
+                pass
+            except Exception as e:
+                self.bot.log.error(f'Error while stopping timer dispatch: {e}')
+        self.bot.log.info('Reminder system shutdown complete')
 
     async def cog_command_error(self, ctx: Context, error: commands.CommandError):
         if isinstance(error, commands.BadArgument):
@@ -323,9 +340,10 @@ class Reminder(commands.Cog):
 
     @cache.cache()
     async def get_timezone(self, user_id: int, /) -> Optional[str]:
-        query = "SELECT timezone from user_settings WHERE id = $1;"
-        record = await self.bot.pool.fetchrow(query, user_id)
-        return record['timezone'] if record else None
+        query = "SELECT timezone FROM user_settings WHERE id = $1;"
+        async with MaybeAcquire(None, pool=self.bot.pool) as conn:
+            record = await conn.fetchrow(query, user_id)
+            return record['timezone'] if record else None
 
     async def get_tzinfo(self, user_id: int, /) -> datetime.tzinfo:
         tz = await self.get_timezone(user_id)
@@ -356,7 +374,7 @@ class Reminder(commands.Cog):
         return Timer(record=record) if record else None
 
     async def wait_for_active_timers(self, *, connection: Optional[asyncpg.Connection] = None, days: int = 7) -> Timer:
-        async with MaybeAcquire(connection=connection, pool=self.bot.pool) as con:
+        async with MaybeAcquire(connection, pool=self.bot.pool) as con:
             timer = await self.get_active_timer(connection=con, days=days)
             if timer is not None:
                 self._have_data.set()
@@ -370,38 +388,79 @@ class Reminder(commands.Cog):
             return await self.get_active_timer(connection=con, days=days)  # type: ignore
 
     async def call_timer(self, timer: Timer) -> None:
-        # delete the timer
-        query = "DELETE FROM reminders WHERE id=$1;"
-        await self.bot.pool.execute(query, timer.id)
+        try:
+            # delete the timer
+            query = "DELETE FROM reminders WHERE id=$1;"
+            async with MaybeAcquire(None, pool=self.bot.pool) as conn:
+                result = await conn.execute(query, timer.id)
+                if result == "DELETE 0":
+                    # Timer was already deleted
+                    return
 
-        # dispatch the event
-        event_name = f'{timer.event}_timer_complete'
-        self.bot.dispatch(event_name, timer)
+            # dispatch the event
+            event_name = f'{timer.event}_timer_complete'
+            self.bot.dispatch(event_name, timer)
+            self.bot.log.info(f'Successfully called timer {timer.id} for event {timer.event}')
+        except Exception as e:
+            self.bot.log.error(f'Error calling timer {timer.id} for event {timer.event}: {e}')
+            # attempt cleanup
+            try:
+                query = "DELETE FROM reminders WHERE id=$1;"
+                await self.bot.pool.execute(query, timer.id)
+            except Exception as e2:
+                self.bot.log.error(f'Failed to cleanup timer {timer.id}: {e2}')
 
     async def dispatch_timers(self) -> None:
+        self.pool = self.bot.pool
+        processed_timers = set()
         try:
             while not self.bot.is_closed():
-                # can only asyncio.sleep for up to ~48 days reliably
-                # so we're gonna cap it off at 40 days
-                # see: http://bugs.python.org/issue20493
                 timer = self._current_timer = await self.wait_for_active_timers(days=40)
                 now = datetime.datetime.utcnow()
+
+                # Skip if already processed
+                if timer.id in processed_timers:
+                    continue
 
                 if timer.expires >= now:
                     to_sleep = (timer.expires - now).total_seconds()
                     await asyncio.sleep(to_sleep)
 
-                await self.call_timer(timer)
+                # Process the timer only once
+                try:
+                    await self.call_timer(timer)
+                    processed_timers.add(timer.id)
+                    # prevent set from growing indefinitely
+                    if len(processed_timers) > 100:
+                        processed_timers.clear()
+                except asyncio.CancelledError:
+                    raise
+                except Exception as e:
+                    self.bot.log.error(f'Error processing timer {timer.id}: {e}')
+
         except asyncio.CancelledError:
+            self.bot.log.info('Timer dispatch task cancelled')
             raise
         except (OSError, discord.ConnectionClosed, asyncpg.PostgresConnectionError):
             self._task.cancel()
             self._task = self.bot.loop.create_task(self.dispatch_timers())
+        except Exception as e:
+            self.bot.log.error(f'Timer dispatch task failed: {e}')
+            self._task.cancel()
+            self._task = self.bot.loop.create_task(self.dispatch_timers())
+
 
     async def short_timer_optimisation(self, seconds: float, timer: Timer) -> None:
-        await asyncio.sleep(seconds)
-        event_name = f'{timer.event}_timer_complete'
-        self.bot.dispatch(event_name, timer)
+        try:
+            await asyncio.sleep(seconds)
+            event_name = f'{timer.event}_timer_complete'
+            self.bot.dispatch(event_name, timer)
+        except Exception as e:
+            self.bot.log.error(f'Error in short timer optimization: {e}')
+            # Fallback to normal timer handling
+            if self._current_timer and timer.expires < self._current_timer.expires:
+                self._task.cancel()
+                self._task = self.bot.loop.create_task(self.dispatch_timers())
 
     async def get_timer(self, event: str, /, **kwargs: Any) -> Optional[Timer]:
         r"""Gets a timer from the database.
@@ -500,18 +559,65 @@ class Reminder(commands.Cog):
         timer = Timer.temporary(event=event, args=args, kwargs=kwargs, expires=when, created=now,
                                 timezone=timezone_name)
         delta = (when - now).total_seconds()
+
+        # Ensure all args and kwargs are JSON serializable
+        try:
+            # Convert any non-serializable objects to strings
+            serializable_args = []
+            for arg in args:
+                if isinstance(arg, (datetime.datetime, datetime.date)):
+                    serializable_args.append(arg.isoformat())
+                elif isinstance(arg, (discord.Object, discord.Member, discord.User)):
+                    serializable_args.append(str(arg.id))
+                else:
+                    serializable_args.append(arg)
+
+            serializable_kwargs = {}
+            for k, v in kwargs.items():
+                if isinstance(v, (datetime.datetime, datetime.date)):
+                    serializable_kwargs[k] = v.isoformat()
+                elif isinstance(v, (discord.Object, discord.Member, discord.User)):
+                    serializable_kwargs[k] = str(v.id)
+                else:
+                    serializable_kwargs[k] = v
+
+            # Test JSON serialization before database insert
+            extra_data = {'args': serializable_args, 'kwargs': serializable_kwargs}
+            json_data = json.dumps(extra_data)  # Convert to JSON string
+
+            query = """INSERT INTO reminders (event, extra, expires, created, timezone)
+                      VALUES ($1, $2::jsonb, $3, $4, $5)
+                      RETURNING id;
+                   """
+
+            try:
+                async with MaybeAcquire(None, pool=self.bot.pool) as conn:
+                    row = await conn.fetchrow(
+                        query,
+                        event,
+                        json_data,
+                        when,
+                        now,
+                        timezone_name
+                    )
+                    timer.id = row['id']
+            except asyncpg.DataError as e:
+                self.bot.log.error(f'Failed to create timer - Data error: {e}')
+                raise
+            except asyncpg.PostgresError as e:
+                self.bot.log.error(f'Failed to create timer - Database error: {e}')
+                raise
+
+        except (TypeError, ValueError) as e:
+            self.bot.log.error(f'Failed to serialize timer data: {e}')
+            raise commands.BadArgument(f'Could not serialize timer data: {e}') from None
+
+        # Short duration optimization after DB insert
         if delta <= 60:
             # a shortcut for small timers
             self.bot.loop.create_task(self.short_timer_optimisation(delta, timer))
+            self.bot.log.info(f"Created short timer for {delta} seconds")
             return timer
-
-        query = """INSERT INTO reminders (event, extra, expires, created, timezone)
-                   VALUES ($1, $2::jsonb, $3, $4, $5)
-                   RETURNING id;
-                """
-
-        row = await pool.fetchrow(query, event, {'args': args, 'kwargs': kwargs}, when, now, timezone_name)
-        timer.id = row[0]
 
         # only set the data check if it can be waited on
         if delta <= (86400 * 40):  # 40 days
@@ -524,6 +630,20 @@ class Reminder(commands.Cog):
             self._task = self.bot.loop.create_task(self.dispatch_timers())
 
         return timer
+
+    @commands.hybrid_command(name="dbtest")
+    async def db_test(self, ctx: commands.Context):
+        """Checks if the bot can access the database."""
+        async with self.pool.acquire() as connection:
+            async with connection.transaction():
+                try:
+                    result = await self.pool.fetchval("SELECT NOW()")
+                    await ctx.send(f"Database connection works. Current time: {result}")
+                except Exception as e:
+                    await ctx.send(f"Test failed.\n{e}")
+                else:
+                    await self.bot.pool.release(connection)
+
 
     @commands.hybrid_group(aliases=['timer', 'remind', 'remindme'], usage='<when>')
     async def reminder(
@@ -548,7 +668,7 @@ class Reminder(commands.Cog):
 
         if len(when.arg) >= 1500:
             return await ctx.send('Reminder must be fewer than 1500 characters.')
-
+        await ctx.defer()
         zone = await self.get_timezone(ctx.author.id)
         timer = await self.create_timer(
             when.dt,
@@ -578,7 +698,7 @@ class Reminder(commands.Cog):
     ):
         """Sets a reminder to remind you of something at a specific time."""
 
-        await interaction.response.defer()
+        await interaction.response.defer(ephemeral=True)
         message = await interaction.original_response()
         zone = await self.get_timezone(interaction.user.id)
         timer = await self.create_timer(
@@ -610,7 +730,7 @@ class Reminder(commands.Cog):
                    LIMIT 10;
                 """
 
-        records = await ctx.db.fetch(query, str(ctx.author.id))
+        records = await self.bot.pool.fetch(query, str(ctx.author.id))
 
         if len(records) == 0:
             return await ctx.send('No currently running reminders.')
@@ -643,7 +763,7 @@ class Reminder(commands.Cog):
                    AND extra #>> '{args,0}' = $2;
                 """
 
-        status = await ctx.db.execute(query, id, str(ctx.author.id))
+        status = await self.pool.execute(query, id, str(ctx.author.id))
         if status == 'DELETE 0':
             return await ctx.send('Could not delete any reminders with that ID.')
 
@@ -668,7 +788,7 @@ class Reminder(commands.Cog):
                 """
 
         author_id = str(ctx.author.id)
-        total: asyncpg.Record = await ctx.db.fetchrow(query, author_id)
+        total: asyncpg.Record = await self.pool.fetchrow(query, author_id)
         total = total[0]
         if total == 0:
             return await ctx.send('You do not have any reminders to delete.')
@@ -678,7 +798,7 @@ class Reminder(commands.Cog):
             return await ctx.send('Aborting', ephemeral=True)
 
         query = """DELETE FROM reminders WHERE event = 'reminder' AND extra #>> '{args,0}' = $1;"""
-        await ctx.db.execute(query, author_id)
+        await self.pool.execute(query, author_id)
 
         # Check if the current timer is the one being cleared and cancel it if so
         if self._current_timer and self._current_timer.author_id == ctx.author.id:
@@ -702,7 +822,7 @@ class Reminder(commands.Cog):
         such as tempblock, tempmute, etc.
         """
 
-        await ctx.db.execute(
+        await self.pool.execute(
             """INSERT INTO user_settings (id, timezone)
                VALUES ($1, $2)
                ON CONFLICT (id) DO UPDATE SET timezone = $2;
@@ -763,7 +883,7 @@ class Reminder(commands.Cog):
     @timezone.command(name='clear')
     async def timezone_clear(self, ctx: Context):
         """Clears your timezone."""
-        await ctx.db.execute("UPDATE user_settings SET timezone = NULL WHERE id=$1", ctx.author.id)
+        await self.pool.execute("UPDATE user_settings SET timezone = NULL WHERE id=$1", ctx.author.id)
         self.get_timezone.invalidate(self, ctx.author.id)
         await ctx.send('Your timezone has been cleared.', ephemeral=True)
 
@@ -792,6 +912,29 @@ class Reminder(commands.Cog):
         else:
             if view is not discord.utils.MISSING:
                 view.message = msg
+
+    @commands.command(name='debugreminder')
+    @commands.is_owner()
+    async def debug_reminder(self, ctx: Context):
+        """Debug command to check reminder system status"""
+        try:
+            query = "SELECT COUNT(*) FROM reminders;"
+            count = await self.bot.pool.fetchval(query)
+
+            current = self._current_timer
+            current_info = "None"
+            if current:
+                current_info = f"ID: {current.id}, Event: {current.event}, Expires: {current.expires}"
+
+            status = f"""Reminder System Status:
+- Total reminders: {count}
+- Current timer: {current_info}
+- Have data flag: {self._have_data.is_set()}
+- Task running: {not self._task.done() if hasattr(self, '_task') else False}"""
+
+            await ctx.send(f"```\n{status}\n```")
+        except Exception as e:
+            await ctx.send(f"Error getting debug info: {str(e)}")
 
 
 async def setup(bot):

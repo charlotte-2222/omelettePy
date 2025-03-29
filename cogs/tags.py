@@ -289,28 +289,6 @@ class Tags(commands.Cog):
                 await tr.commit()
                 # await ctx.send(f'Tag {name} successfully created.')
 
-    # def is_tag_being_made(self, guild_id: int, name: str) -> bool:
-    #     try:
-    #         being_made = self._reserved_tags_being_made[guild_id]
-    #     except KeyError:
-    #         return False
-    #     else:
-    #         return name.lower() in being_made
-    #
-    # def add_in_progress_tag(self, guild_id: int, name: str) -> None:
-    #     tags = self._reserved_tags_being_made.setdefault(guild_id, set())
-    #     tags.add(name.lower())
-    #
-    # def remove_in_progress_tag(self, guild_id: int, name: str) -> None:
-    #     try:
-    #         being_made = self._reserved_tags_being_made[guild_id]
-    #     except KeyError:
-    #         return
-    #
-    #     being_made.discard(name.lower())
-    #     if len(being_made) == 0:
-    #         del self._reserved_tags_being_made[guild_id]
-
     # These are hopefully fast enough. Through a query planner these take around ~20ms each.
 
     async def non_aliased_tag_autocomplete(
@@ -944,95 +922,6 @@ class Tags(commands.Cog):
             return await ctx.send('This server has no tags.')
 
         await ctx.send(f'Random tag found: {tag["name"]}\n{tag["content"]}')
-
-    # @app_commands.command(name="new-tag")
-    # @commands.cooldown(1, 3, commands.BucketType.user)
-    # async def tag_create(self, interaction: discord.Interaction) -> None:
-    #     """
-    #     This command will open a modal for you to create a new tag.
-    #     """
-    #     await interaction.response.send_modal(TagMakeModal())
-    #
-    # @commands.hybrid_command(name="tag")
-    # @commands.cooldown(1, 3, commands.BucketType.user)
-    # async def tag_find(self, ctx: commands.Context, tag_name: str):
-    #     """
-    #     This is the command you will use to find a tag from the database by current guild.
-    #     Context: /tag <name_of_tag>
-    #     """
-    #     try:
-    #         guild = ctx.guild
-    #         cursor.execute(
-    #             "SELECT tag_content FROM tag_list WHERE (tag_name)=? AND (guild_id)=? LIMIT 1 COLLATE NOCASE",
-    #             (tag_name, guild.id,))
-    #         query = cursor.fetchone()  # search db for tag name.
-    #         output = "\"" + str(query[0]) + "\""
-    #         np_output = (output.replace('"', ''))
-    #
-    #         await ctx.send(f"{np_output}")
-    #     except Exception as e:
-    #         # idk what im doing with the `e` variable
-    #         # but im too afraid to change it
-    #
-    #         guild = ctx.guild
-    #         cursor.execute(
-    #             "SELECT tag_name FROM tag_list WHERE tag_name LIKE (?) AND guild_id =? LIMIT 6 COLLATE NOCASE",
-    #             ("%" + tag_name + "%", guild.id,))
-    #         query = cursor.fetchall()  # Limiting to 6 so it isn't damn near ridiculous
-    #
-    #         # begin converting tuple to string via numpy
-    #         # ive found this is the most efficient method for removing
-    #         # the extra shit in a tuple while also keeping the whole list.
-    #
-    #         np_query = np.array(query)
-    #         np_str_query = np.array2string(np_query, separator=', ')
-    #         np_str_clean = ((np_str_query.replace('[', '').
-    #                          replace(']', '')).
-    #                         replace("'", ''))
-    #         if np_str_clean == "":
-    #             await ctx.send(f"**No tags that correspond either directly or somewhat to `{tag_name}` were found.**\n")
-    #             return
-    #         else:
-    #             # fucking convoluted as hell
-    #             await ctx.send(f"**No tags corresponding to `{tag_name}` were found.**\n"
-    #                            f"***Did you mean...***\n"
-    #                            f"{np_str_clean}")
-    #     db.commit()
-    #
-    # @commands.hybrid_command(name="search-tags")
-    # @commands.cooldown(1, 3, commands.BucketType.user)
-    # async def tag_search(self, ctx: GuildContext, *, query: Annotated[str, commands.clean_content]):
-    #     """searches for a tag
-    #     query must be at least 3 characters long
-    #     """
-    #
-    #     guild = ctx.guild
-    #
-    #     if len(query) < 3:
-    #         return await ctx.send('The query length must be at least 3 characters long.')
-    #
-    #     cursor.execute(
-    #         "SELECT tag_name FROM tag_list WHERE tag_name LIKE (?) AND guild_id =? ORDER BY tag_name DESC LIMIT 100 ",
-    #         ("%" + query + "%", guild.id))
-    #
-    #     result = cursor.fetchall()
-    #     np_query = np.array(result)
-    #     np_str_query = np.array2string(np_query, separator=', ')
-    #     np_str_clean = ((np_str_query.replace('[', '').
-    #                      replace(']', '')).
-    #                     replace("'", ''))
-    #
-    #     # if result:
-    #     #     p = TagPages(entries=result, per_page=20, ctx=ctx)
-    #     #     await p.start()
-    #     # else:
-    #     #     await ctx.send('No tags found.')
-    #
-    #     embed = discord.Embed(title=f'Search Results for {query}',
-    #                           description=f"{np_str_clean}\n\n*Run the tag command to use one.*",
-    #                           color=discord.Color.blurple())
-    #
-    #     await ctx.send(embed=embed)
 
     @commands.command(hidden=True)
     @commands.guild_only()

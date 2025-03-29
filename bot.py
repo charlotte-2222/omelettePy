@@ -4,14 +4,12 @@ import contextlib
 import datetime
 import logging
 import logging.handlers
-import sys
 from collections import defaultdict
 from logging import exception
 from typing import Iterable, AsyncIterator, TYPE_CHECKING, Optional, Any, Union
 
 import aiohttp
 import asyncpg
-import click
 import discord
 from discord.ext import commands
 
@@ -84,6 +82,13 @@ def setup_logging():
             log.removeHandler(hdlr)
 
 
+def _prefix_callable(bot: OmelettePy, msg: discord.Message):
+    prefixes = ['>>']
+    if msg.guild is None:
+        return ['?', '!']
+    return commands.when_mentioned_or(*prefixes)(bot, msg)
+
+
 async def create_pool() -> asyncpg.Pool:
     try:
         return await asyncpg.create_pool(
@@ -97,20 +102,11 @@ async def create_pool() -> asyncpg.Pool:
         print(f"Failed to create DB pool: {e}")
 
 
-
-def _prefix_callable(bot: OmelettePy, msg: discord.Message):
-    prefixes = ['>>']
-    if msg.guild is None:
-        return ['?', '!']
-    return commands.when_mentioned_or(*prefixes)(bot, msg)
-
-
 class OmelettePy(commands.AutoShardedBot):
     pool: asyncpg.Pool
     bot_app_info: discord.AppInfo
     user: discord.ClientUser
     logging_handler: Any
-
     def __init__(self):
         allowed_mentions = discord.AllowedMentions(roles=False, everyone=False, users=True)
         intents = discord.Intents(
@@ -129,13 +125,14 @@ class OmelettePy(commands.AutoShardedBot):
                          allowed_mentions=allowed_mentions,
                          enable_debug_events=True
                          )
-
+        self.pool = None
         self.resumes: defaultdict[int, list[datetime.datetime]] = defaultdict(list)
         self.identifies: defaultdict[int, list[datetime.datetime]] = defaultdict(list)
 
 
     async def setup_hook(self) -> None:
         self.session = aiohttp.ClientSession()
+        self.pool = await create_pool()
         self.bot_app_info = await self.application_info()
         self.owner_id = self.bot_app_info.team.owner_id
         self.log = logging.getLogger()
@@ -146,17 +143,6 @@ class OmelettePy(commands.AutoShardedBot):
             except Exception as e:
                 self.log.exception('Failed to load extension %s.',
                                    extension + f'\n{e}')
-
-        try:
-            pool = await create_pool()
-        except Exception:
-            click.echo('Could not set up PostgreSQL. Exiting.', file=sys.stderr)
-            log.exception('Could not set up PostgreSQL. Exiting.')
-            return
-
-        bot.pool = pool
-        #self.start_tasks()
-
 
     @property
     def owner(self) -> discord.User:
@@ -296,7 +282,6 @@ class OmelettePy(commands.AutoShardedBot):
     async def on_ready(self):
         if not hasattr(self, 'uptime'):
             self.uptime = discord.utils.utcnow()
-
         log.info('Logged in as %s (ID: %s)', self.user.name, self.user.id)
 
     async def on_shard_resumed(self, shard_id: int) -> None:
@@ -319,6 +304,7 @@ class OmelettePy(commands.AutoShardedBot):
 
     async def close(self) -> None:
         await super().close()
+        await self.pool.close()
         await self.session.close()
 
     @property
