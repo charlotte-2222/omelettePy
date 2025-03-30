@@ -8,10 +8,13 @@ import asyncpg
 import discord
 from discord import app_commands
 from discord.ext import commands
+from dotenv import load_dotenv
 
-from utilFunc import formats
+from utilFunc import formats, config
 from utilFunc.context import GuildContext, Context
 from utilFunc.paginator import SimplePages
+
+load_dotenv()
 
 """
 This is the tags cog.
@@ -118,11 +121,11 @@ class TagMakeModal(discord.ui.Modal, title='Create New Tag'):
 
     async def on_submit(self, interaction: discord.Interaction):
         db_pool = await asyncpg.create_pool(
-            database="OmelettePy",
-            user="postgres",
-            password="Astra",
-            host="localhost",
-            port=5432
+            database=config.DB_NAME,
+            user=config.DB_USER,
+            password=config.DB_PASSWORD,
+            host=config.DB_HOST,
+            port=config.DB_PORT
         )
         tag_name = self.name.value.lower()
         query = "SELECT 1 FROM tags WHERE LOWER(name)=$1;"
@@ -177,11 +180,11 @@ class Tags(commands.Cog):
             await ctx.send(str(error))
 
     async def setup_hook(self) -> None:
-        self.db = await asyncpg.connect(database="OmelettePy",
-                                        user="postgres",
-                                        password="Astra",
-                                        host="localhost",
-                                        port=5432
+        self.db = await asyncpg.connect(database=config.DB_NAME,
+                                        user=config.DB_USER,
+                                        password=config.DB_PASSWORD,
+                                        host=config.DB_HOST,
+                                        port=config.DB_PORT
                                         )
 
     async def get_possible_tags(
@@ -963,10 +966,10 @@ class Tags(commands.Cog):
 
 async def setup(bot: commands.Bot):
     db_pool = await asyncpg.create_pool(
-        database="OmelettePy",
-        user="postgres",
-        password="Astra",
-        host="localhost",
-        port=5432
+        database=config.DB_NAME,
+        user=config.DB_USER,
+        password=config.DB_PASSWORD,
+        host=config.DB_HOST,
+        port=config.DB_PORT
     )
     await bot.add_cog(Tags(bot, db_pool))

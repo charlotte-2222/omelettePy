@@ -12,6 +12,7 @@ import aiohttp
 import asyncpg
 import discord
 from discord.ext import commands
+from sqlalchemy.testing.plugin.plugin_base import config
 
 from utilFunc.config import TOKEN
 from utilFunc.context import Context
@@ -20,6 +21,10 @@ if TYPE_CHECKING:
     from cogs.reminders import Reminder
     from utilFunc.config import Config as ConfigCog
     # from launcher import create_pool
+
+from dotenv import load_dotenv
+
+load_dotenv()
 
 description = """
 I'm a general purpose bot written in Python by Charlotte. I'm still in development, but I hope to add a lot of new features!
@@ -108,11 +113,11 @@ def _prefix_callable(bot: OmelettePy, msg: discord.Message):
 async def create_pool() -> asyncpg.Pool:
     try:
         return await asyncpg.create_pool(
-            database="OmelettePy",
-            user="postgres",
-            password="Astra",
-            host="localhost",
-            port=5432
+            database=config.DB_NAME,
+            user=config.DB_USER,
+            password=config.DB_PASSWORD,
+            host=config.DB_HOST,
+            port=config.DB_PORT
         )
     except exception as e:
         print(f"Failed to create DB pool: {e}")
