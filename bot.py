@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-import contextlib
+import asyncio
 import datetime
 import logging
 import logging.handlers
 from collections import defaultdict
 from logging import exception
-from typing import Iterable, AsyncIterator, TYPE_CHECKING, Optional, Any, Union
+from typing import Iterable, AsyncIterator, TYPE_CHECKING, Optional, Union
 
 import aiohttp
 import asyncpg
@@ -25,7 +25,7 @@ description = """
 I'm a general purpose bot written in Python by Charlotte. I'm still in development, but I hope to add a lot of new features!
 """
 
-log = logging.getLogger('discord')
+log = logging.getLogger('ommiepy')
 
 
 initial_extensions = [
@@ -52,34 +52,50 @@ class RemoveNoise(logging.Filter):
         return True
 
 
-@contextlib.contextmanager
+
 def setup_logging():
     log = logging.getLogger()
-    try:
-        # discord.utils.setup_logging()
-        # __enter__
-        logging.getLogger('discord').setLevel(logging.INFO)
-        logging.getLogger('discord.http').setLevel(logging.WARNING)
-        logging.getLogger('discord.state').addFilter(RemoveNoise())
 
-        log.setLevel(logging.INFO)
-        handler = logging.handlers.RotatingFileHandler(filename='ommiepy.log',
-                                                       encoding='utf-8',
-                                                       maxBytes=32 * 1024 * 1024,  # 32 MiB
-                                                       backupCount=5,  # Rotate through 5 files
-                                                       )
-        dt_fmt = '%Y-%m-%d %H:%M:%S'
-        fmt = logging.Formatter('[{asctime}] [{levelname:<7}] {name}: {message}', dt_fmt, style='{')
-        handler.setFormatter(fmt)
-        log.addHandler(handler)
+    # Remove any existing handlers to avoid duplicates
+    for handler in log.handlers[:]:
+        log.removeHandler(handler)
 
-        yield
-    finally:
-        # __exit__
-        handlers = log.handlers[:]
-        for hdlr in handlers:
-            hdlr.close()
-            log.removeHandler(hdlr)
+    # Set the base logging level
+    log.setLevel(logging.INFO)
+
+    # Console Handler
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.INFO)
+    console_format = logging.Formatter('[{asctime}] [{levelname:<8}] {name}: {message}',
+                                       datefmt='%Y-%m-%d %H:%M:%S',
+                                       style='{')
+    console_handler.setFormatter(console_format)
+    log.addHandler(console_handler)
+
+    # File Handler
+    file_handler = logging.handlers.RotatingFileHandler(
+        filename='ommiepy.log',
+        encoding='utf-8',
+        maxBytes=32 * 1024 * 1024,  # 32 MiB
+        backupCount=5
+    )
+    file_handler.setLevel(logging.INFO)
+    file_format = logging.Formatter('[{asctime}] [{levelname:<8}] {name}: {message}',
+                                    datefmt='%Y-%m-%d %H:%M:%S',
+                                    style='{')
+    file_handler.setFormatter(file_format)
+    log.addHandler(file_handler)
+
+    # Discord.py specific logging
+    discord_logger = logging.getLogger('discord')
+    discord_logger.setLevel(logging.INFO)
+    discord_http = logging.getLogger('discord.http')
+    discord_http.setLevel(logging.WARNING)
+
+    # Add the noise filter
+    discord_logger.addFilter(RemoveNoise())
+
+    return log
 
 
 def _prefix_callable(bot: OmelettePy, msg: discord.Message):
@@ -106,7 +122,8 @@ class OmelettePy(commands.AutoShardedBot):
     pool: asyncpg.Pool
     bot_app_info: discord.AppInfo
     user: discord.ClientUser
-    logging_handler: Any
+
+    # logging_handler: Any
     def __init__(self):
         allowed_mentions = discord.AllowedMentions(roles=False, everyone=False, users=True)
         intents = discord.Intents(
@@ -116,6 +133,7 @@ class OmelettePy(commands.AutoShardedBot):
             reactions=True,
             message_content=True
         )
+        self.log = setup_logging()
         super().__init__(command_prefix=_prefix_callable,
                          description=description,
                          strip_after_prefix=True,
@@ -135,11 +153,12 @@ class OmelettePy(commands.AutoShardedBot):
         self.pool = await create_pool()
         self.bot_app_info = await self.application_info()
         self.owner_id = self.bot_app_info.team.owner_id
-        self.log = logging.getLogger()
+
 
         for extension in initial_extensions:
             try:
                 await self.load_extension(extension)
+                self.log.info('Loaded extension %s.', extension)
             except Exception as e:
                 self.log.exception('Failed to load extension %s.',
                                    extension + f'\n{e}')
@@ -282,7 +301,7 @@ class OmelettePy(commands.AutoShardedBot):
     async def on_ready(self):
         if not hasattr(self, 'uptime'):
             self.uptime = discord.utils.utcnow()
-        log.info('Logged in as %s (ID: %s)', self.user.name, self.user.id)
+        self.log.info('Logged in as %s (ID: %s)', self.user.name, self.user.id)
 
     async def on_shard_resumed(self, shard_id: int) -> None:
         log.info('Shard ID %s has resumed...', shard_id)
@@ -303,9 +322,23 @@ class OmelettePy(commands.AutoShardedBot):
         await self.process_commands(message)
 
     async def close(self) -> None:
-        await super().close()
-        await self.pool.close()
-        await self.session.close()
+        self.log.info('Closing bot...')
+        try:
+            # cancel running tasks
+            for task in asyncio.all_tasks(self.loop):
+                if task is not asyncio.current_task(self.loop):
+                    task.cancel()
+            # close connection
+            if hasattr(self, 'session'):
+                await self.session.close()
+            if hasattr(self, 'pool'):
+                await self.pool.close()
+
+            # call parent close
+            await super().close()
+            self.log.info('Bot closed.')
+        except Exception as e:
+            self.log.exception('Error while closing bot: %s', e)
 
     @property
     def config(self):
@@ -320,5 +353,31 @@ class OmelettePy(commands.AutoShardedBot):
         return self.get_cog('Config')  # type: ignore
 
 
-bot = OmelettePy()
-bot.run(TOKEN, log_handler=None)
+def main():
+    log = setup_logging()
+    try:
+        log.info('=' * 50)  # Add separator line before session start
+        log.info('Starting new bot session')
+        log.info('=' * 50)
+        bot = OmelettePy()
+        bot.run(TOKEN, log_handler=None)
+    except KeyboardInterrupt:
+        log.info('Bot stopped by user.')
+    except Exception as e:
+        log.exception('Fatal error: %s', e)
+        return 1
+    finally:
+        log.info('=' * 50)  # Add separator line after session end
+        log.info('End of bot session')
+        log.info('=' * 50)
+        handlers = log.handlers[:]
+        for hdlr in handlers:
+            hdlr.close()
+            log.removeHandler(hdlr)
+    return 0
+
+
+if __name__ == '__main__':
+    import sys
+
+    sys.exit(main())
