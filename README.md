@@ -1,30 +1,65 @@
 # omelettePy
-A Discord Utility bot, by [Charlotte](https://github.com/charlotte-2222)
+
+A Discord Utility bot with GUI control panel, by [Charlotte](https://github.com/charlotte-2222)
 
 <img src="https://raw.githubusercontent.com/charlotte-2222/charlotte-2222/32de06aa5256b8f3fbee5de105ce485d1bf8f360/trans-rights.svg">
 
 ### Key Features
+
+- **Modern GUI Control Panel**
+  - Real-time bot monitoring
+  - Cog reloading interface
+  - Live log output
+  - Git repository management
+  - Reminder system monitoring
 - **Slash Command/**[**app_commands**](https://discordpy.readthedocs.io/en/stable/interactions/api.html?highlight=app_commands#discord.app_commands.AppCommand) **enabled!**
-- GitHub API Features (Search, View Issues, Latest Commit)
-- Tagging system: Store important information per-server via tags!
+- **GitHub Integration**
+  - Repository status monitoring
+  - Automated updates
+  - API features (Search, View Issues, Latest Commit)
+- **Advanced Reminder System**
+  - PostgreSQL-backed persistence
+  - Timezone support
+  - Click-to-jump message links
+- **Tagging System**
+  - Store important information per-server
+  - Easy retrieval and management
 
-**SQLite3 database**
-  -
-For [quotes](https://github.com/charlotte-2222/omelettePy/blob/master/cogs/events.py#L41), [tags](https://github.com/charlotte-2222/omelettePy/blob/master/cogs/tags.py#L67)
-  and [reminders!](https://github.com/charlotte-2222/omelettePy/blob/master/cogs/reminders.py)
-- **Scalability**
-- **Ease of use**
-- **Non-Invasive**
+### Database Integration
 
-### Looking to the future
-This bot is purely a utility bot, and I make updates and enhancements with that in mind.
-I hope to continuously update this bot with new features for the user at my own pace, however
-there are no concrete plans in place for anything specific. Suggestions can be raised via
-the [support server](https://discord.gg/DPjV9xRRXb) or directly in this repo.
+- **PostgreSQL** for reminders, tags, rtfm and core functionality
+- **SQLite** for quotes
+- Features:
+  - [Quotes System](https://github.com/charlotte-2222/omelettePy/blob/master/cogs/events.py#L41)
+  - [Tag Management](https://github.com/charlotte-2222/omelettePy/blob/master/cogs/tags.py#L67)
+  - [Reminder System](https://github.com/charlotte-2222/omelettePy/blob/master/cogs/reminders.py)
 
-Thanks! 
+### Technical Features
+
+- Modern asyncio-based architecture
+- Thread-safe GUI updates
+- Robust error handling and logging
+- Easy deployment and maintenance
+- Non-invasive design philosophy
+
+### Future Development
+
+This bot continues to evolve as a comprehensive utility bot with a focus on:
+
+- Enhanced GUI features
+- Expanded GitHub integration
+- Additional developer tools
+- Performance optimizations
+
+**Suggestions and contributions are welcome through:**
+
+- [Support Server](https://discord.gg/DPjV9xRRXb)
+- GitHub Issues
+- Pull Requests
 
 ## Privacy Policy and Terms of Service
-I'm required to make one of these, however there isn't anything to note.
 
-OmelettePy does not store personal data in any form, and is open source and free to use.
+OmelettePy is open source and free to use. The bot does not store personal data in any form beyond what is necessary for
+core functionality (such as reminder IDs and server-specific tags).
+
+
