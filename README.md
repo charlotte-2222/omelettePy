@@ -30,8 +30,8 @@ A Discord Utility bot with GUI control panel, by [Charlotte](https://github.com/
 - **PostgreSQL** for reminders, tags, rtfm and core functionality
 - **SQLite** for quotes
 - Features:
-  - [Quotes System](https://github.com/charlotte-2222/omelettePy/blob/master/cogs/events.py#L41)
-  - [Tag Management](https://github.com/charlotte-2222/omelettePy/blob/master/cogs/tags.py#L67)
+  - [Quotes System](https://github.com/charlotte-2222/omelettePy/blob/master/cogs/quotes.py)
+  - [Tag Management](https://github.com/charlotte-2222/omelettePy/blob/master/cogs/tags.py)
   - [Reminder System](https://github.com/charlotte-2222/omelettePy/blob/master/cogs/reminders.py)
 
 ### Technical Features
