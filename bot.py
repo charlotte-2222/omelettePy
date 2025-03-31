@@ -12,9 +12,9 @@ import aiohttp
 import asyncpg
 import discord
 from discord.ext import commands
-from sqlalchemy.testing.plugin.plugin_base import config
 
-from utilFunc.config import TOKEN
+import utilFunc.config
+from gui import BotGUI
 from utilFunc.context import Context
 
 if TYPE_CHECKING:
@@ -113,11 +113,11 @@ def _prefix_callable(bot: OmelettePy, msg: discord.Message):
 async def create_pool() -> asyncpg.Pool:
     try:
         return await asyncpg.create_pool(
-            database=config.DB_NAME,
-            user=config.DB_USER,
-            password=config.DB_PASSWORD,
-            host=config.DB_HOST,
-            port=config.DB_PORT
+            database=utilFunc.config.DB_NAME,
+            user=utilFunc.config.DB_USER,
+            password=utilFunc.config.DB_PASSWORD,
+            host=utilFunc.config.DB_HOST,
+            port=utilFunc.config.DB_PORT
         )
     except exception as e:
         print(f"Failed to create DB pool: {e}")
@@ -347,7 +347,7 @@ class OmelettePy(commands.AutoShardedBot):
 
     @property
     def config(self):
-        return __import__('config')
+        return utilFunc.config
 
     @property
     def reminder(self) -> Optional[Reminder]:
@@ -364,8 +364,11 @@ def main():
         log.info('=' * 50)  # Add separator line before session start
         log.info('Starting new bot session')
         log.info('=' * 50)
+        # Initialize the bot
         bot = OmelettePy()
-        bot.run(TOKEN, log_handler=None)
+        # Load the GUI and start the bot
+        gui = BotGUI(bot)
+        gui.run()
     except KeyboardInterrupt:
         log.info('Bot stopped by user.')
     except Exception as e:
@@ -384,5 +387,4 @@ def main():
 
 if __name__ == '__main__':
     import sys
-
     sys.exit(main())

@@ -10,6 +10,7 @@ from discord import app_commands
 from discord.ext import commands
 from dotenv import load_dotenv
 
+import utilFunc
 from utilFunc import formats, config
 from utilFunc.context import GuildContext, Context
 from utilFunc.paginator import SimplePages
@@ -121,11 +122,11 @@ class TagMakeModal(discord.ui.Modal, title='Create New Tag'):
 
     async def on_submit(self, interaction: discord.Interaction):
         db_pool = await asyncpg.create_pool(
-            database=config.DB_NAME,
-            user=config.DB_USER,
-            password=config.DB_PASSWORD,
-            host=config.DB_HOST,
-            port=config.DB_PORT
+            database=utilFunc.config.DB_NAME,
+            user=utilFunc.config.DB_USER,
+            password=utilFunc.config.DB_PASSWORD,
+            host=utilFunc.config.DB_HOST,
+            port=utilFunc.config.DB_PORT
         )
         tag_name = self.name.value.lower()
         query = "SELECT 1 FROM tags WHERE LOWER(name)=$1;"
@@ -180,11 +181,11 @@ class Tags(commands.Cog):
             await ctx.send(str(error))
 
     async def setup_hook(self) -> None:
-        self.db = await asyncpg.connect(database=config.DB_NAME,
-                                        user=config.DB_USER,
-                                        password=config.DB_PASSWORD,
-                                        host=config.DB_HOST,
-                                        port=config.DB_PORT
+        self.db = await asyncpg.connect(database=utilFunc.config.DB_NAME,
+                                        user=utilFunc.config.DB_USER,
+                                        password=utilFunc.config.DB_PASSWORD,
+                                        host=utilFunc.config.DB_HOST,
+                                        port=utilFunc.config.DB_PORT
                                         )
 
     async def get_possible_tags(
@@ -966,10 +967,10 @@ class Tags(commands.Cog):
 
 async def setup(bot: commands.Bot):
     db_pool = await asyncpg.create_pool(
-        database=config.DB_NAME,
-        user=config.DB_USER,
-        password=config.DB_PASSWORD,
-        host=config.DB_HOST,
-        port=config.DB_PORT
+        database=utilFunc.config.DB_NAME,
+        user=utilFunc.config.DB_USER,
+        password=utilFunc.config.DB_PASSWORD,
+        host=utilFunc.config.DB_HOST,
+        port=utilFunc.config.DB_PORT
     )
     await bot.add_cog(Tags(bot, db_pool))

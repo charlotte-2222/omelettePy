@@ -913,9 +913,9 @@ class Reminder(commands.Cog):
             if view is not discord.utils.MISSING:
                 view.message = msg
 
-    @commands.command(name='debugreminder')
+    @app_commands.command(name='debugreminder')
     @commands.is_owner()
-    async def debug_reminder(self, ctx: Context):
+    async def debug_reminder(self, interaction: discord.Interaction):
         """Debug command to check reminder system status"""
         try:
             query = "SELECT COUNT(*) FROM reminders;"
@@ -930,11 +930,12 @@ class Reminder(commands.Cog):
 - Total reminders: {count}
 - Current timer: {current_info}
 - Have data flag: {self._have_data.is_set()}
-- Task running: {not self._task.done() if hasattr(self, '_task') else False}"""
+- Task running: {not self._task.done() if hasattr(self, '_task') else False}
+- Bot Latency: {self.bot.latency * 1000:.2f}ms"""
 
-            await ctx.send(f"```\n{status}\n```")
+            await interaction.response.send_message(f"```\n{status}\n```", ephemeral=False)
         except Exception as e:
-            await ctx.send(f"Error getting debug info: {str(e)}")
+            await interaction.response.send_message(f"Error getting debug info: {str(e)}")
 
 
 async def setup(bot):
