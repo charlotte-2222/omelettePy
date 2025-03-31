@@ -5,6 +5,7 @@ import threading
 import tkinter as tk
 from tkinter import ttk, scrolledtext
 
+import discord
 import sv_ttk
 from git import Repo
 
@@ -36,19 +37,61 @@ class BotGUI:
         # Set theme
         sv_ttk.use_dark_theme()
 
-        # Create main container
-        main_container = ttk.Frame(self.root, padding="10")
+        # Create root frame with scrollbar
+        root_frame = ttk.Frame(self.root)
+        root_frame.pack(fill=tk.BOTH, expand=True)
+
+        # Add canvas with scrollbar
+        canvas = tk.Canvas(root_frame)
+        scrollbar = ttk.Scrollbar(root_frame, orient="vertical", command=canvas.yview)
+        self.scrollable_frame = ttk.Frame(canvas)
+
+        # Configure canvas
+        self.scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+        canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        # Pack scrollbar and canvas
+        scrollbar.pack(side="right", fill="y")
+        canvas.pack(side="left", fill="both", expand=True)
+
+        # Create main container in scrollable frame
+        main_container = ttk.Frame(self.scrollable_frame, padding="10")
         main_container.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+
 
         # Status Frame
         status_frame = ttk.LabelFrame(main_container, text="Bot Status", padding="5")
         status_frame.grid(row=0, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=5)
 
-        self.status_label = ttk.Label(status_frame, text="Status: Disconnected")
+        self.status_label = ttk.Label(status_frame, text="Status: Disconnected", background="red")
         self.status_label.grid(row=0, column=0, sticky=tk.W)
 
         self.latency_label = ttk.Label(status_frame, text="Latency: --")
         self.latency_label.grid(row=0, column=1, padx=20, sticky=tk.W)
+
+        # Uptime Frame
+        uptime_frame = ttk.LabelFrame(main_container, text="Bot Uptime", padding="5")
+        uptime_frame.grid(row=6, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=5)
+
+        self.uptime_label = ttk.Label(uptime_frame, text="Uptime: --")
+        self.uptime_label.grid(row=0, column=0, sticky=tk.W)
+
+        # Server Stats Frame
+        server_stats_frame = ttk.LabelFrame(main_container, text="Server Statistics", padding="5")
+        server_stats_frame.grid(row=8, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=5)
+
+        # Server stats labels
+        self.server_count_label = ttk.Label(server_stats_frame, text="Server Count: --")
+        self.server_count_label.grid(row=0, column=0, sticky=tk.W)
+        self.member_count_label = ttk.Label(server_stats_frame, text="Total Members: --")
+        self.member_count_label.grid(row=1, column=0, sticky=tk.W)
+
+        self.channel_count_label = ttk.Label(server_stats_frame, text="Total Channels: --")
+        self.channel_count_label.grid(row=2, column=0, sticky=tk.W)
 
         # Control Frame
         control_frame = ttk.LabelFrame(main_container, text="Controls", padding="5")
@@ -95,12 +138,31 @@ class BotGUI:
         self.git_update_status = ttk.Label(git_update_frame, text="Update Status: Unknown")
         self.git_update_status.grid(row=1, column=0, padx=5, pady=5, sticky=tk.W)
 
+        # Cog Management Frame
+        cog_management_frame = ttk.LabelFrame(main_container, text="Cog Management", padding="5")
+        cog_management_frame.grid(row=9, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=5)
+
+        self.cog_entry = ttk.Entry(cog_management_frame, width=30)
+        self.cog_entry.grid(row=0, column=0, padx=5, pady=5)
+
+        ttk.Button(cog_management_frame, text="Load Cog", command=self.load_cog).grid(row=0, column=1, padx=5, pady=5)
+        ttk.Button(cog_management_frame, text="Unload Cog", command=self.unload_cog).grid(row=0, column=2, padx=5,
+                                                                                          pady=5)
+
+
         # Configure grid weights
         main_container.columnconfigure(0, weight=1)
         main_container.columnconfigure(1, weight=1)
-        main_container.columnconfigure(2, weight=0)  # Fixed width for GitHub column
+        main_container.columnconfigure(2, weight=0)
         main_container.rowconfigure(2, weight=1)
         main_container.rowconfigure(3, weight=1)
+
+        # Add mousewheel scrolling
+        def _on_mousewheel(event):
+            canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
+        # Bind mouse wheel to canvas
+        canvas.bind_all("<MouseWheel>", _on_mousewheel)
 
     def setup_logging(self):
         class GUIHandler(logging.Handler):
@@ -137,8 +199,18 @@ class BotGUI:
     def update_status(self):
         """Update bot status information"""
         if self.bot.is_ready():
-            self.status_label.config(text=f"Status: Connected as {self.bot.user}")
+            self.status_label.config(text=f"Status: Connected as {self.bot.user}", background="green")
             self.latency_label.config(text=f"Latency: {self.bot.latency * 1000:.2f}ms")
+
+            # Update uptime if available
+            if hasattr(self.bot, 'uptime'):
+                uptime = discord.utils.utcnow() - self.bot.uptime
+                self.uptime_label.config(text=f"Uptime: {uptime}")
+
+            guild = self.bot.guilds[0]
+            self.server_count_label.config(text=f"Servers: {len(self.bot.guilds)}")
+            self.member_count_label.config(text=f"Members: {guild.member_count}")
+            self.channel_count_label.config(text=f"Channels: {len(guild.channels)}")
 
             # Update reminder count if reminder cog is loaded
             reminder_cog = self.bot.get_cog('Reminder')
@@ -228,6 +300,18 @@ class BotGUI:
         except Exception as e:
             self.git_update_status.config(text="Status: Update failed")
             self.error_log_text.insert(tk.END, f"Error updating repository: {str(e)}\n")
+
+    def load_cog(self):
+        cog_name = self.cog_entry.get()
+        if cog_name:
+            asyncio.run_coroutine_threadsafe(self.bot.load_extension(cog_name), self.bot.loop)
+            self.log_text.insert(tk.END, f"Loaded cog: {cog_name}\n")
+
+    def unload_cog(self):
+        cog_name = self.cog_entry.get()
+        if cog_name:
+            asyncio.run_coroutine_threadsafe(self.bot.unload_extension(cog_name), self.bot.loop)
+            self.log_text.insert(tk.END, f"Unloaded cog: {cog_name}\n")
 
     def run(self):
         """Start the GUI main loop"""
