@@ -117,8 +117,8 @@ class API(commands.Cog):
                                         user="postgres",
                                         password="Astra",
                                         host="localhost",
-                                        port=5432
-                                        )
+                                        port="5432")
+
 
     @property
     def display_emoji(self) -> discord.PartialEmoji:

@@ -11,6 +11,7 @@ from typing import Iterable, AsyncIterator, TYPE_CHECKING, Optional, Union
 import aiohttp
 import asyncpg
 import discord
+from PyQt6.QtWidgets import QApplication
 from discord.ext import commands
 
 import utilFunc.config
@@ -359,6 +360,7 @@ class OmelettePy(commands.AutoShardedBot):
 
 
 def main():
+    app = QApplication(sys.argv)
     log = setup_logging()
     try:
         log.info('=' * 50)  # Add separator line before session start
@@ -369,6 +371,7 @@ def main():
         # Load the GUI and start the bot
         gui = BotGUI(bot)
         gui.run()
+        app.exec()
     except KeyboardInterrupt:
         log.info('Bot stopped by user.')
     except Exception as e:
