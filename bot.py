@@ -113,15 +113,31 @@ def _prefix_callable(bot: OmelettePy, msg: discord.Message):
 
 async def create_pool() -> asyncpg.Pool:
     try:
-        return await asyncpg.create_pool(
-            database=utilFunc.config.DB_NAME,
-            user=utilFunc.config.DB_USER,
-            password=utilFunc.config.DB_PASSWORD,
-            host=utilFunc.config.DB_HOST,
-            port=utilFunc.config.DB_PORT
-        )
+        # add retry logic for pool creation
+        for attempt in range(3):
+            try:
+                pool = await asyncpg.create_pool(
+                    database=utilFunc.config.DB_NAME,
+                    user=utilFunc.config.DB_USER,
+                    password=utilFunc.config.DB_PASSWORD,
+                    host=utilFunc.config.DB_HOST,
+                    port=utilFunc.config.DB_PORT,
+                    command_timeout=30,
+                    min_size=20,
+                    max_size=100
+                )
+                if pool:
+                    log.info("DB pool created successfully.")
+                    return pool
+            except Exception as e:
+                log.error(f"Failed to create DB pool (attempt {attempt + 1}): {e}")
+                if attempt < 2:
+                    await asyncio.sleep(5)
+                continue
+        raise RuntimeError("Failed to create DB pool after 3 attempts.")
     except exception as e:
-        print(f"Failed to create DB pool: {e}")
+        log.critical("Failed to create DB pool: %s", e)
+        raise
 
 
 class OmelettePy(commands.AutoShardedBot):
@@ -155,19 +171,25 @@ class OmelettePy(commands.AutoShardedBot):
 
 
     async def setup_hook(self) -> None:
-        self.session = aiohttp.ClientSession()
-        self.pool = await create_pool()
-        self.bot_app_info = await self.application_info()
-        self.owner_id = self.bot_app_info.team.owner_id
+        try:
+            self.session = aiohttp.ClientSession()
+            self.pool = await create_pool()
+            self.bot_app_info = await self.application_info()
+            self.owner_id = self.bot_app_info.team.owner_id
 
-
-        for extension in initial_extensions:
-            try:
-                await self.load_extension(extension)
-                self.log.info('Loaded extension %s.', extension)
-            except Exception as e:
-                self.log.exception('Failed to load extension %s.',
-                                   extension + f'\n{e}')
+            if not self.pool:
+                raise RuntimeError("Failed to create DB pool.")
+            # Load all extensions
+            for extension in initial_extensions:
+                try:
+                    await self.load_extension(extension)
+                    self.log.info('Loaded extension %s.', extension)
+                except Exception as e:
+                    self.log.exception('Failed to load extension %s.',
+                                       extension + f'\n{e}')
+        except Exception as e:
+            self.log.exception('Failed to initialize bot: %s', e)
+            raise
 
     @property
     def owner(self) -> discord.User:

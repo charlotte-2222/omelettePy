@@ -82,6 +82,8 @@ class BotControlsMixin:
                     self.resource_timer.stop()
                 if hasattr(self, 'uptime_timer'):
                     self.uptime_timer.stop()
+                if hasattr(self, 'reminder_timer'):
+                    self.reminder_timer.stop()
                 if hasattr(self, 'timer'):
                     self.timer.stop()
                 # Update UI
@@ -101,13 +103,16 @@ class BotControlsMixin:
                 for task in asyncio.all_tasks(self.gui_loop):
                     task.cancel()
 
-    async def reload_cogs(self):
-        try:
-            for extension in self.bot.extensions.copy():
-                await self.bot.reload_extension(extension)
-            self.log_text.append("All cogs reloaded successfully\n")
-        except Exception as e:
-            self.error_log_text.append(f"Error reloading cogs: {str(e)}\n")
+    def reload_cogs(self):
+        async def _reload():
+            try:
+                for extension in self.bot.extensions.copy():
+                    await self.bot.reload_extension(extension)
+                self.log_text.append("All cogs reloaded successfully\n")
+            except Exception as e:
+                self.error_log_text.append(f"Error reloading cogs: {str(e)}\n")
+
+        asyncio.run_coroutine_threadsafe(_reload(), self.gui_loop)
 
     def load_cog(self):
         cog_name = self.cog_entry.text().strip()
@@ -187,6 +192,22 @@ class BotControlsMixin:
         self.uptime_timer = QTimer(self)
         self.uptime_timer.timeout.connect(update_uptime)
         self.uptime_timer.start(1000)  # Update every second
+
+    def add_reminder_monitor(self):
+        def update_reminders():
+            try:
+                if hasattr(self.bot, 'is_ready') and self.bot.is_ready() and self.bot.reminder:
+                    active_reminders = len(self.bot.reminder._current_timer)
+                    self.reminder_label.setText(f"Active Reminders: {active_reminders}")
+                else:
+                    self.reminder_label.setText("No active reminders")
+            except Exception as e:
+                self.error_log_text.append(f"Reminder monitor error: {str(e)}\n")
+
+        # Store timer as instance variable
+        self.reminder_timer = QTimer(self)
+        self.reminder_timer.timeout.connect(update_reminders)
+        self.reminder_timer.start(1000)
 
     def run(self):
         self.show()

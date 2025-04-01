@@ -62,14 +62,14 @@ class BotGUI(QMainWindow, BotControlsMixin, GUIStylesMixin):
         self.setup_timer()
         self.setup_window()
         self.setup_theme_and_styles()
+        self.add_reminder_monitor()
 
     def setup_window(self):
         self.setWindowTitle("OmelettePy Bot Control Panel")
         self.setMinimumSize(1000, 700)
 
-        # Add status bar
+        # Add status bar (customized)
         self.statusBar().showMessage("Ready")
-
         self.statusBar().setStyleSheet("""
             QStatusBar {
                 background: rgba(43, 43, 43, 130);
@@ -77,6 +77,10 @@ class BotGUI(QMainWindow, BotControlsMixin, GUIStylesMixin):
                 border-top: 1px solid rgba(80, 80, 80, 130);
             }
         """)
+        self.status_label = QLabel("Status: Disconnected")
+        self.status_label.setStyleSheet("color: #e74c3c")  # Red
+
+
 
         self.setStyleSheet(self.styleSheet() + """
         QMainWindow {
@@ -154,8 +158,10 @@ class BotGUI(QMainWindow, BotControlsMixin, GUIStylesMixin):
         layout = QHBoxLayout()
         self.status_label = QLabel("Status: Disconnected")
         self.latency_label = QLabel("Latency: --")
+        self.reminder_label = QLabel("Active Reminders: --")
         layout.addWidget(self.status_label)
         layout.addWidget(self.latency_label)
+        layout.addWidget(self.reminder_label)
         group.setLayout(layout)
         parent_layout.addWidget(group)
 

@@ -128,14 +128,27 @@ class GUIStylesMixin:
         self.error_log_text.setFont(mono_font)
 
     def setup_status_indicators(self):
-        self.status_label.setStyleSheet("color: #e74c3c")  # Red for disconnected
+        # Apply trans flag gradient to status label
+        self.status_label.setStyleSheet("""
+            QLabel {
+                background: qlineargradient(
+                    x1: 0, y1: 0, x2: 0, y2: 1,
+                    stop: 0 rgba(91, 206, 250, 180),   /* Trans flag light blue */
+                    stop: 0.4 rgba(245, 169, 184, 180), /* Trans flag pink */
+                    stop: 0.6 rgba(255, 255, 255, 180), /* Trans flag white */
+                    stop: 1 rgba(91, 206, 250, 180)     /* Trans flag light blue */
+                );
+                padding: 2px 5px;
+                border-radius: 3px;
+                color: #ffffff;
+            }
+        """)
         self.latency_label.setStyleSheet("color: #ffffff")
 
         # Style for Git status labels
         self.git_status_label.setStyleSheet("color: #ffffff")
         self.git_commit_label.setStyleSheet("color: #ffffff")
         self.git_update_status.setStyleSheet("color: #ffffff")
-
     def adjust_layouts(self):
         # Add spacing between widgets
         for layout in self.findChildren(QVBoxLayout) + self.findChildren(QHBoxLayout):

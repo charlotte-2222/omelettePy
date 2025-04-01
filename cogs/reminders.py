@@ -272,6 +272,28 @@ class Reminder(commands.Cog):
     async def cog_load(self) -> None:
         try:
             await self.parse_bcp47_timezones()
+
+            # check for pending timers
+            query = """
+                SELECT * FROM reminders
+                WHERE expires < CURRENT_TIMESTAMP
+                ORDER BY expires;
+            """
+
+            pending_count = await self.bot.pool.fetch(query)
+            if pending_count:
+                self.bot.log.warning(f'Found {pending_count} pending timers in the database.')
+                for record in pending_count:
+                    timer = Timer(record=record)
+                    # schedule the timer for dispatch
+                    self.bot.loop.create_task(self.call_timer(timer))
+
+                # set data flag to trigger normal timer dispatch
+                self._have_data.set()
+            else:
+                self.bot.log.info('No pending timers found in the database.')
+
+            # initialize the timer dispatch task
             self._task = self.bot.loop.create_task(self.dispatch_timers())
             self.bot.log.info('Reminder system initialized')
         except Exception as e:
