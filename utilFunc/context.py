@@ -135,6 +135,10 @@ class Context(commands.Context):
     command: commands.Command[Any, ..., Any]
     bot: OmelettePy
 
+    @property
+    def db(self):
+        return self.bot.pool
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.pool: Pool = self.bot.pool
@@ -274,6 +278,22 @@ class Context(commands.Context):
             return await self.send(file=discord.File(fp, filename='message_too_long.txt'), **kwargs)
         else:
             return await self.send(content)
+
+    async def send(self, content=None, **kwargs):
+        if content and hasattr(self.bot, 'get_cog'):
+            user_cog = self.bot.get_cog('User')
+            if user_cog:
+                can_mention = await user_cog.can_mention(self.author.id)
+                if not can_mention:
+                    # Replace user mentions with plain text
+                    if isinstance(content, str):
+                        for mention in self.message.mentions:
+                            content = content.replace(f'<@{mention.id}>', f'@{mention.name}')
+                    # Disable mentions in the message
+                    kwargs['allowed_mentions'] = discord.AllowedMentions.none()
+
+        return await super().send(content, **kwargs)
+
 
 
 class GuildContext(Context):

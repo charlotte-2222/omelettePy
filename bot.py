@@ -44,7 +44,7 @@ initial_extensions = [
     'cogs.git_stuff',
     'cogs.reminders',
     'cogs.api',
-    # 'cogs.gpt_cog'
+    'cogs.userSettings'
 ]
 
 
@@ -348,6 +348,30 @@ class OmelettePy(commands.AutoShardedBot):
         if message.author.bot:
             return
         await self.process_commands(message)
+
+        query = """
+            SELECT allow_mentions 
+            FROM user_settings
+            WHERE id = $1;
+        """
+        record = await self.pool.fetchrow(query, message.author.id)
+
+        if record and not record['allow_mentions']:
+            # set allowed mentions
+            self.allowed_mentions = discord.AllowedMentions(
+                everyone=False,
+                users=False,
+                roles=False,
+                replied_user=False
+            )
+        else:
+            # reset to default
+            self.allowed_mentions = discord.AllowedMentions(
+                everyone=False,
+                users=True,
+                roles=False,
+                replied_user=True
+            )
 
     async def close(self) -> None:
         self.log.info('Closing bot...')
