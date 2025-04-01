@@ -1,65 +1,79 @@
 # omelettePy
 
-A Discord Utility bot with GUI control panel, by [Charlotte](https://github.com/charlotte-2222)
+A Discord Utility bot, by [Charlotte](https://github.com/charlotte-2222)
 
 <img src="https://raw.githubusercontent.com/charlotte-2222/charlotte-2222/32de06aa5256b8f3fbee5de105ce485d1bf8f360/trans-rights.svg">
 
-### Key Features
+![GitHub release (latest by date)](https://img.shields.io/github/v/release/charlotte-2222/omelettePy)
+![GitHub commit activity](https://img.shields.io/github/commit-activity/m/charlotte-2222/omelettePy)
 
-- **Modern GUI Control Panel**
-  - Real-time bot monitoring
-  - Cog reloading interface
-  - Live log output
-  - Git repository management
-  - Reminder system monitoring
-- **Slash Command/**[**app_commands**](https://discordpy.readthedocs.io/en/stable/interactions/api.html?highlight=app_commands#discord.app_commands.AppCommand) **enabled!**
+## Features
+
+- **Database(s)**
+  - asyncpg/PostgreSQL database for tags and reminders.
+    - Tags allow users to create and store large amounts of text, and retrieve them later.
+    - Reminders is simply task scheduling. Allows for storing timezones and "human" time conversion.
+  - Sqlite3 DB for quotes.
+    - Quotes are a simple way to store and retrieve quotes. This is more of a fun thing, thus sqlite3 is used.
+
 - **GitHub Integration**
-  - Repository status monitoring
-  - Automated updates
-  - API features (Search, View Issues, Latest Commit)
-- **Advanced Reminder System**
-  - PostgreSQL-backed persistence
-  - Timezone support
-  - Click-to-jump message links
-- **Tagging System**
-  - Store important information per-server
-  - Easy retrieval and management
+  - Allows for easy access to GitHub repositories and issues.
+  - Allows for easy access to GitHub Gists.
+  - Allows for easy access to GitHub Actions.
 
-### Database Integration
+- **Weather**
+  - Allows for easy access to weather information.
+  - Allows for easy access to weather forecasts.
+  - Allows for easy access to weather alerts.
 
-- **PostgreSQL** for reminders, tags, rtfm and core functionality
-- **SQLite** for quotes
-- Features:
-  - [Quotes System](https://github.com/charlotte-2222/omelettePy/blob/master/cogs/quotes.py)
-  - [Tag Management](https://github.com/charlotte-2222/omelettePy/blob/master/cogs/tags.py)
-  - [Reminder System](https://github.com/charlotte-2222/omelettePy/blob/master/cogs/reminders.py)
+- **RTFM (Read the fucking manual)**
+  - If users ask silly questions without reading documentation, this links to specifc locations in the documentation.
+  - Page Types:
+    - Discord.py (stable, latest)
+    - Python
+    - Discord.py, Japanese (stable, latest)
+    - Python, Japanese (stable, latest)
+- **GUI**
+  - A rather simple gui using a rather complex library (PyQt6).
+  - Allows for real-time monitoring of the bot, resources, and other miscellaneous things.
+  - Logging and debugging.
+  - Looks nice and is fun but is overall not needed for greater function.
 
-### Technical Features
+# Installation
 
-- Modern asyncio-based architecture
-- Thread-safe GUI updates
-- Robust error handling and logging
-- Easy deployment and maintenance
-- Non-invasive design philosophy
+I would recommend not running your own instance of this bot, it can be a pain to set up and maintain.
 
-### Future Development
+1. Python 3.8 or higher is required
 
-This bot continues to evolve as a comprehensive utility bot with a focus on:
+this is a requirement for the bot to run, and is not optional.
 
-- Enhanced GUI features
-- Expanded GitHub integration
-- Additional developer tools
-- Performance optimizations
+2. Setup a virtual environment
 
-**Suggestions and contributions are welcome through:**
+`python3.8 -m venv venv`
 
-- [Support Server](https://discord.gg/DPjV9xRRXb)
-- GitHub Issues
-- Pull Requests
+3. Install dependencies
+
+`pip install -U -r requirements.txt`
+
+4. Create the database in PostgreSQL
+
+You will need PostgreSQL installed and running.
+
+Migrations should run automatically for database setup (tables, etc)., but you can run them manually if needed via
+migrations folder.
+
+5. Setup config.py
+
+An example config.py is provided in the repository. You will need to fill in the values for your bot.
+
+---
+That should be it for basic setup, I recommend using PyCharm is it will take care of most of the work.
 
 ## Privacy Policy and Terms of Service
 
-OmelettePy is open source and free to use. The bot does not store personal data in any form beyond what is necessary for
-core functionality (such as reminder IDs and server-specific tags).
+I am required by discord to create this.
+
+This bot does not store sensitive or personal user information.
+
 
 
